@@ -6,7 +6,11 @@ from scipy.stats import truncnorm  # To generate truncated normal distributions
 from tqdm import tqdm  # Progress bar for loops (e.g., simulations)
 import matplotlib.pyplot as plt  # Plotting and visualization (optional but useful)
 
+# Insert file to the excel file here
+# Serena
 path = "C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/means.xlsx"
+# Alice
+# path = "C:/Users/alice/OneDrive/Escritorio/OR2-group10-Assignment2/means.xlsx" 
 
 # Upload data
 means_df = pd.read_excel(path)
