@@ -1,11 +1,3 @@
-# Connect Colab to Drive
-from google.colab import drive
-drive.mount('/content/drive')
-
-# Enable embedding of external content
-from google.colab import output
-output.enable_custom_widget_manager()
-
 #Required libraries
 import numpy as np  # Numerical operations and array handling
 import pandas as pd  # DataFrame handling and reading Excel files
@@ -14,15 +6,16 @@ from scipy.stats import truncnorm  # To generate truncated normal distributions
 from tqdm import tqdm  # Progress bar for loops (e.g., simulations)
 import matplotlib.pyplot as plt  # Plotting and visualization (optional but useful)
 
-
-path = "/content/drive/MyDrive/OR2/means.xlsx"
+path = "C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/means.xlsx"
 
 # Upload data
 means_df = pd.read_excel(path)
 
+print ("loading code")
+
 # Visualize first rows
 means_df.head()
-
+print(means_df.head(10)) 
 # Fixed problem parameters
 # Decision Rule Thresholds
 γ1 = 23                 # γ₁: price threshold to start buying (from market or storing excess generation)
@@ -169,7 +162,7 @@ def simulate_many_days(N, γ1, γ2, μ_L, μ_E, μ_P):
 
 
 #Running
-N = 10000  # Use 1000000 later
+N = 100  # Use 1000000 later
 expected_profit, sample_variance = simulate_many_days(N, γ1, γ2, μ_L, μ_E, μ_P)
 print("Expected daily profit:", expected_profit)
 print("Sample variance of profit:", sample_variance)
