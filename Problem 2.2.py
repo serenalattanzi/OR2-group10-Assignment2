@@ -53,7 +53,7 @@ def sample_truncated_normal(mean, std, lower, upper, rng):
     return truncnorm.rvs(a, b, loc=mean, scale=std, random_state=rng)
 
 #Samples creation
-def samples_matrix(N, μ_L, μ_E, μ_P, δ, RC, T=97):
+def sample_parameters(N, μ_L, μ_E, μ_P, δ, RC, T=97):
     rng = np.random.default_rng(seed=1)
 
     #Generation
@@ -135,54 +135,77 @@ def simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
     return C
 
 #Simulate many days
-def simulate_many_days(E_all, L_all, P_all, γ1, γ2, δ=5, RC=50):
-    N = E_all.shape[0]
-    profits = []
+# def simulate_many_days(E_all, L_all, P_all, γ1, γ2, δ=5, RC=50):
+#     N = E_all.shape[0]
+#     profits = []
 
-    for i in tqdm(range(N), desc="Simulating", unit="day", dynamic_ncols=True): #Show progress bar
-        profit = simulate_one_day(E_all[i], L_all[i], P_all[i], γ1, γ2, δ, RC)
-        profits.append(profit)
+#     for i in tqdm(range(N), desc="Simulating", unit="day", dynamic_ncols=True): #Show progress bar
+#         profit = simulate_one_day(E_all[i], L_all[i], P_all[i], γ1, γ2, δ, RC)
+#         profits.append(profit)
 
-    mean_profit = np.mean(profits)
-    variance_profit = np.var(profits, ddof=1)
-    return mean_profit, variance_profit, profits
+#     mean_profit = np.mean(profits)
+#     variance_profit = np.var(profits, ddof=1)
+#     return mean_profit, variance_profit, profits
 
-# Exploitation Policy Sampling 
+# # Exploitation Policy Sampling 
 
-def exploitation_policy(M, N, E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
+# def sample_policy(M, N, E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
  
-    #Run M experiments
+#     #Run M experiments
+#     for m in tqdm(range(M), desc="Exploitation Experiments"):
+#         rng = np.random.default_rng(seed=m + 1000)  # unique RNG per experiment
+
+
+#         μ_alt = np.full(K, 5500.0)      # prior mean
+#         σ2_μ = np.full(K, 1200.0**2)  # prior variance
+#         n_obs = np.zeros(K)  # number of observations for each alternative
+
+#         for day in range(N):
+#             # Select alternative with highest posterior mean μᵢⁿ
+#             chosen_idx = np.argmax(mu)
+#             γ1, γ2 = alts[chosen_idx]
+#             # Simulate that day's profit using selected (γ₁, γ₂)
+#             profit = simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ, RC)
+#             # Update belief
+#             n_obs[i_star] += 1
+#             μ_alt[i_star] += (profit - μ_alt[i_star]) / n_obs[i_star]
+
+#             # Store actual profit
+#             selected_quality[m, day] = profit
+
+#     return selected_quality
+
+def simulate_exploitation_policy(M, N, E_all, L_all, P_all, δ=5, RC=50):
+    """
+    Simulate M experiments, each for N days, using exploitation policy:
+    Each day, select (γ1, γ2) with highest current estimated mean profit.
+    """
+    K = len(alts)
+    selected_quality = np.zeros((M, N))
     for m in tqdm(range(M), desc="Exploitation Experiments"):
-        rng = np.random.default_rng(seed=m + 1000)  # unique RNG per experiment
-
-
         μ_alt = np.full(K, 5500.0)      # prior mean
-        σ2_μ = np.full(K, 1200.0**2)  # prior variance
-        n_obs = np.zeros(K)  # number of observations for each alternative
+        n_obs = np.zeros(K)             # number of observations for each alternative
 
         for day in range(N):
-            # Select alternative with highest posterior mean μᵢⁿ
-            chosen_idx = np.argmax(mu)
+            # Choose best alternative so far
+            chosen_idx = np.argmax(μ_alt)
             γ1, γ2 = alts[chosen_idx]
-            # Simulate that day's profit using selected (γ₁, γ₂)
-            profit = simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ, RC)
-            # Update belief
-            n_obs[i_star] += 1
-            μ_alt[i_star] += (profit - μ_alt[i_star]) / n_obs[i_star]
-
-            # Store actual profit
+            # Simulate profit for this day using chosen (γ1, γ2)
+            profit = simulate_one_day(E_all[day], L_all[day], P_all[day], γ1, γ2, δ, RC)
+            # Update belief for chosen alternative
+            n_obs[chosen_idx] += 1
+            μ_alt[chosen_idx] += (profit - μ_alt[chosen_idx]) / n_obs[chosen_idx]
+            # Store profit
             selected_quality[m, day] = profit
-
     return selected_quality
-
-
 
 #Running
 M = 100  # Number of experiments
 N = 500  # Number of days to simulate
 
-E_all, L_all, P_all = samples_matrix(N, γ1, γ2, μ_L, μ_E, μ_P)
-mean_profit, variance_profit, profits = simulate_many_days(E_all, L_all, P_all, γ1, γ2)
+E_all, L_all, P_all = sample_parameters(N, μ_L, μ_E, μ_P, δ, RC, T)
+selected_quality = simulate_exploitation_policy(M, N, E_all, L_all, P_all, δ=5, RC=50)
+#simulate_many_days(E_all, L_all, P_all, γ1, γ2)
 
 print("Expected daily profit:", mean_profit)
 print("Sample variance of profit:", variance_profit)
