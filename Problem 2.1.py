@@ -57,7 +57,7 @@ def sample_truncated_normal(mean, std, lower, upper, rng):
 γ2 = 26                 # γ₂: price threshold to start selling (from battery to market)
 
 #Samples creation
-def samples_matrix(N, γ1, γ2, μ_L, μ_E, μ_P, δ=5, RC=50, T=97):
+def samples_matrix(N, μ_L, μ_E, μ_P, δ, RC, T=97):
     rng = np.random.default_rng(seed=1)
 
     #Generation
@@ -91,7 +91,7 @@ def samples_matrix(N, γ1, γ2, μ_L, μ_E, μ_P, δ=5, RC=50, T=97):
     return E_t_all, L_t_all, P_t_all
 
 #Simulate one day
-def simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
+def simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ, RC):
     R = 25
     C = 0
     T = E_t.shape[0]
@@ -145,7 +145,7 @@ def simulate_many_days(E_all, L_all, P_all, γ1, γ2, δ=5, RC=50):
     return mean_profit, variance_profit, profits
 
 #Running
-N = 1000000  
+N = 100  
 
 E_all, L_all, P_all = samples_matrix(N, γ1, γ2, μ_L, μ_E, μ_P)
 mean_profit, variance_profit, profits = simulate_many_days(E_all, L_all, P_all, γ1, γ2)

@@ -41,16 +41,7 @@ T = 97                  # T: number of time steps per day (15-minute intervals)
 #xRM → battery to market  (R → M)
 
 #c_t → profit at time t [€]
-#C   → total daily profit [€]
-
-# Decision Rule Thresholds
-alts = [(γ1, γ2) for γ1 in range(22, 27) for γ2 in range(25, 31) if γ1 < γ2]
-K = len(alts)  # Total number of alternatives (27)
-
-mu = np.full(len(alternatives()), 5500.0)      # prior mean
-sigma2 = np.full(len(alternatives()), 1200.0**2)  # prior variance
-n = np.zeros(len(alternatives()))              # number of times each alternative was tried
-
+#C   → total daily profit [€]           
 
 #Random Number Generatoryrs
 MasterRNG = np.random.default_rng(seed=1)  #For reproducible stream of seeds
@@ -62,7 +53,7 @@ def sample_truncated_normal(mean, std, lower, upper, rng):
     return truncnorm.rvs(a, b, loc=mean, scale=std, random_state=rng)
 
 #Samples creation
-def samples_matrix(N, γ1, γ2, μ_L, μ_E, μ_P, δ=5, RC=50, T=97):
+def samples_matrix(N, μ_L, μ_E, μ_P, δ, RC, T=97):
     rng = np.random.default_rng(seed=1)
 
     #Generation
@@ -94,6 +85,13 @@ def samples_matrix(N, γ1, γ2, μ_L, μ_E, μ_P, δ=5, RC=50, T=97):
         size=(N, T), random_state=rng
     )
     return E_t_all, L_t_all, P_t_all
+
+# Decision Rule Thresholds
+alts = [(γ1, γ2) for γ1 in range(22, 27) for γ2 in range(25, 31) if γ1 < γ2]
+K = len(alts)  # Total number of alternatives (27)
+selected_quality = np.zeros((M,N)) 
+
+σ2_W = 1200**2 # Constant observation variance for all alternatives
 
 #Simulate one day
 def simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
@@ -149,8 +147,39 @@ def simulate_many_days(E_all, L_all, P_all, γ1, γ2, δ=5, RC=50):
     variance_profit = np.var(profits, ddof=1)
     return mean_profit, variance_profit, profits
 
+# Exploitation Policy Sampling 
+
+def exploitation_policy(M, N, E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
+ 
+    #Run M experiments
+    for m in tqdm(range(M), desc="Exploitation Experiments"):
+        rng = np.random.default_rng(seed=m + 1000)  # unique RNG per experiment
+
+
+        μ_alt = np.full(K, 5500.0)      # prior mean
+        σ2_μ = np.full(K, 1200.0**2)  # prior variance
+        n_obs = np.zeros(K)  # number of observations for each alternative
+
+        for day in range(N):
+            # Select alternative with highest posterior mean μᵢⁿ
+            chosen_idx = np.argmax(mu)
+            γ1, γ2 = alts[chosen_idx]
+            # Simulate that day's profit using selected (γ₁, γ₂)
+            profit = simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ, RC)
+            # Update belief
+            n_obs[i_star] += 1
+            μ_alt[i_star] += (profit - μ_alt[i_star]) / n_obs[i_star]
+
+            # Store actual profit
+            selected_quality[m, day] = profit
+
+    return selected_quality
+
+
+
 #Running
-N = 1000000  
+M = 100  # Number of experiments
+N = 500  # Number of days to simulate
 
 E_all, L_all, P_all = samples_matrix(N, γ1, γ2, μ_L, μ_E, μ_P)
 mean_profit, variance_profit, profits = simulate_many_days(E_all, L_all, P_all, γ1, γ2)
