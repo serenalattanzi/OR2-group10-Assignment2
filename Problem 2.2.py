@@ -87,11 +87,9 @@ def sample_parameters(N, μ_L, μ_E, μ_P, δ, RC, T=97):
     return E_t_all, L_t_all, P_t_all
 
 # Decision Rule Thresholds
-alts = [(γ1, γ2) for γ1 in range(22, 27) for γ2 in range(25, 31) if γ1 < γ2]
-K = len(alts)  # Total number of alternatives (27)
+Y = [(γ1, γ2) for γ1 in range(22, 27) for γ2 in range(25, 31) if γ1 < γ2]
+K = len(Y)  # Total number of alternatives (27)
 selected_quality = np.zeros((M,N)) 
-
-σ2_W = 1200**2 # Constant observation variance for all alternatives
 
 #Simulate one day
 def simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
@@ -134,70 +132,76 @@ def simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
 
     return C
 
-#Simulate many days
-# def simulate_many_days(E_all, L_all, P_all, γ1, γ2, δ=5, RC=50):
-#     N = E_all.shape[0]
-#     profits = []
-
-#     for i in tqdm(range(N), desc="Simulating", unit="day", dynamic_ncols=True): #Show progress bar
-#         profit = simulate_one_day(E_all[i], L_all[i], P_all[i], γ1, γ2, δ, RC)
-#         profits.append(profit)
-
-#     mean_profit = np.mean(profits)
-#     variance_profit = np.var(profits, ddof=1)
-#     return mean_profit, variance_profit, profits
-
-# # Exploitation Policy Sampling 
-
-# def sample_policy(M, N, E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
- 
-#     #Run M experiments
-#     for m in tqdm(range(M), desc="Exploitation Experiments"):
-#         rng = np.random.default_rng(seed=m + 1000)  # unique RNG per experiment
-
-
-#         μ_alt = np.full(K, 5500.0)      # prior mean
-#         σ2_μ = np.full(K, 1200.0**2)  # prior variance
-#         n_obs = np.zeros(K)  # number of observations for each alternative
-
-#         for day in range(N):
-#             # Select alternative with highest posterior mean μᵢⁿ
-#             chosen_idx = np.argmax(mu)
-#             γ1, γ2 = alts[chosen_idx]
-#             # Simulate that day's profit using selected (γ₁, γ₂)
-#             profit = simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ, RC)
-#             # Update belief
-#             n_obs[i_star] += 1
-#             μ_alt[i_star] += (profit - μ_alt[i_star]) / n_obs[i_star]
-
-#             # Store actual profit
-#             selected_quality[m, day] = profit
-
-#     return selected_quality
-
 def simulate_exploitation_policy(M, N, E_all, L_all, P_all, δ=5, RC=50):
-    """
-    Simulate M experiments, each for N days, using exploitation policy:
-    Each day, select (γ1, γ2) with highest current estimated mean profit.
-    """
-    K = len(alts)
-    selected_quality = np.zeros((M, N))
-    for m in tqdm(range(M), desc="Exploitation Experiments"):
-        μ_alt = np.full(K, 5500.0)      # prior mean
-        n_obs = np.zeros(K)             # number of observations for each alternative
+   
+    # prior bliefs
+    μ_0 = np.full(K, 5500.0)      # prior mean
+    var_0 = np.full(K, 1200.0**2)  # prior variance
+    n_obs = np.zeros(K)             # number of observations for each alternativ
 
-        for day in range(N):
+    # Known variances
+    σ_w = 1200 # Constant observation variance for all alternatives
+    var_w = σ_w**2  
+
+    # storage
+    quality_matrix = np.zeros((M, N))
+    precision_matrix = np.zeros((M, N))
+
+    # Epsilon for epsilon-greedy policy
+    epsilon_0 = 0.95
+
+    rng_master = np.random.default_rng(seed=123)
+
+    # Run M experiments
+    for m in tqdm(range(M), desc=f"Running policy {policy_name}", ncols=100):
+        rng = np.random.default_rng(rng_master.integers(1e6)) # unique RNG per experiment
+
+        μ = np.full(K, μ_0, dtype=np.float64)
+        var = np.full(K, var_0, dtype=np.float64)
+
+        for n in range(N):
             # Choose best alternative so far
-            chosen_idx = np.argmax(μ_alt)
-            γ1, γ2 = alts[chosen_idx]
+
+            if policy_name == "exploration":
+                choice = n % K
+
+            elif policy_name == "exploitation":
+                choice = np.argmax(μ)
+
+            elif policy_name == "epsilon-greedy":
+                epsilon = epsilon_0 * (1 - n / N)
+                if rng.random() < epsilon:
+                    choice = rng.integers(K)
+                else:
+                    choice = np.argmax(μ)
+
+            elif policy_name == "kg":
+                kg_values = np.sqrt(var) * (σ_w / (σ_w + np.sqrt(var)))
+                choice = np.argmax(μ + kg_values)
+
+            else:
+                raise ValueError("Unknown policy")
+            
+            γ1, γ2 = Y[choice]
+
             # Simulate profit for this day using chosen (γ1, γ2)
-            profit = simulate_one_day(E_all[day], L_all[day], P_all[day], γ1, γ2, δ, RC)
-            # Update belief for chosen alternative
-            n_obs[chosen_idx] += 1
-            μ_alt[chosen_idx] += (profit - μ_alt[chosen_idx]) / n_obs[chosen_idx]
-            # Store profit
-            selected_quality[m, day] = profit
-    return selected_quality
+            profit = simulate_one_day(E_all[m], L_all[m], P_all[m], γ1, γ2, δ, RC)
+        
+            # Update belief for chosen alternative 
+            μ_old = μ[choice]
+            var_old = var[choice]
+            μ[choice] = (μ_old * var_w + profit * var_old) / (var_old + var_w)
+            var[choice] = (var_old * var_w) / (var_old + var_w)
+
+            # Store results
+            quality_matrix[m, n] = profit
+            precision_matrix[m, n] = 1 / var[choice]
+
+    avg_quality = quality_matrix.mean(axis=0)
+    var_quality = quality_matrix.var(axis=0, ddof=1)
+    avg_precision = precision_matrix.mean(axis=0)
+
+    return avg_quality, var_quality, avg_precision
 
 #Running
 M = 100  # Number of experiments
@@ -207,5 +211,18 @@ E_all, L_all, P_all = sample_parameters(N, μ_L, μ_E, μ_P, δ, RC, T)
 selected_quality = simulate_exploitation_policy(M, N, E_all, L_all, P_all, δ=5, RC=50)
 #simulate_many_days(E_all, L_all, P_all, γ1, γ2)
 
-print("Expected daily profit:", mean_profit)
-print("Sample variance of profit:", variance_profit)
+results = {}
+for policy in ['exploration', 'exploitation', 'epsilon-greedy', 'kg']:
+    results[policy] = run_policy_offline(policy, E_all, L_all, P_all)
+
+import matplotlib.pyplot as plt
+
+for policy in results:
+    plt.plot(results[policy][0], label=f"{policy} avg quality")
+plt.legend()
+plt.title("Average True Quality Over Time (Offline Learning)")
+plt.xlabel("Day")
+plt.ylabel("Average Quality")
+plt.grid()
+plt.show()
+
