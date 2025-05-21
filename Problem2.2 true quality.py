@@ -53,8 +53,11 @@ def sample_truncated_normal(mean, std, lower, upper, rng):
     return truncnorm.rvs(a, b, loc=mean, scale=std, random_state=rng)
 
 # Decision Rule Thresholds
-γ1 = 23                 # γ₁: price threshold to start buying (from market or storing excess generation)
-γ2 = 26                 # γ₂: price threshold to start selling (from battery to market)
+# Definition of the 27 alternatives
+alts = [(γ1, γ2) for γ1 in range(22, 27) for γ2 in range(25, 31) if γ1 < γ2]
+
+#γ1 = 23                 # γ₁: price threshold to start buying (from market or storing excess generation)
+#γ2 = 26                 # γ₂: price threshold to start selling (from battery to market)
 
 #Samples creation
 def samples_matrix(N, μ_L, μ_E, μ_P, δ, RC, T=97):
@@ -136,19 +139,37 @@ def simulate_many_days(E_all, L_all, P_all, γ1, γ2, δ=5, RC=50):
     N = E_all.shape[0]
     profits = []
 
-    for i in tqdm(range(N), desc="Simulating", unit="day", dynamic_ncols=True): #Show progress bar
+    for i in tqdm(range(N), desc=f"Simulating for γ=({γ1},{γ2})", unit="day", dynamic_ncols=True): #Show progress bar
         profit = simulate_one_day(E_all[i], L_all[i], P_all[i], γ1, γ2, δ, RC)
         profits.append(profit)
 
     mean_profit = np.mean(profits)
     variance_profit = np.var(profits, ddof=1)
-    return mean_profit, variance_profit, profits
+    return mean_profit, variance_profit
+
+
+def evaluate_all_alternatives(E_all, L_all, P_all, δ=5, RC=50):
+    
+    results = []
+    alternatives = [(γ1, γ2) for γ1 in range(22, 27) for γ2 in range(25, 31) if γ1 < γ2]
+
+    for γ1, γ2 in tqdm(alternatives, desc="Evaluating all alternatives"):
+        mean_profit, variance_profit = simulate_many_days(E_all, L_all, P_all, γ1, γ2, δ, RC)
+        results.append((γ1, γ2, mean_profit, variance_profit))
+
+    df = pd.DataFrame(results, columns=["γ1", "γ2", "mean_profit", "variance_profit"])
+    return df
+
 
 #Running
-N = 100  
+N = 1000000  
 
-E_all, L_all, P_all = samples_matrix(N, γ1, γ2, μ_L, μ_E, μ_P)
-mean_profit, variance_profit, profits = simulate_many_days(E_all, L_all, P_all, γ1, γ2)
+E_all, L_all, P_all = samples_matrix(N, μ_L, μ_E, μ_P,  δ, RC, T)
 
-print("Expected daily profit:", mean_profit)
-print("Sample variance of profit:", variance_profit)
+results_df = evaluate_all_alternatives(E_all, L_all, P_all, δ, RC)
+
+# Save results to CSV
+results_df.to_csv("true_quality_table.csv", index=False)
+
+# Show top results
+print(results_df.sort_values("mean_profit", ascending=False).head())
