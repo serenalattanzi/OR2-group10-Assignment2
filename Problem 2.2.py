@@ -82,8 +82,8 @@ def sample_parameters(N, μ_L, μ_E, μ_P, δ, RC, T=97):
         (P_low - μ_P_mat) / P_std,
         (P_high - μ_P_mat) / P_std,
         loc=μ_P_mat, scale=P_std,
-        size=(N, T), random_state=rng
-    )
+        size=(N, T), random_state=rng)
+    
     return E_t_all, L_t_all, P_t_all
 
 # Decision Rule Thresholds
@@ -132,12 +132,12 @@ def simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
 
     return C
 
-def simulate_exploitation_policy(M, N, E_all, L_all, P_all, δ=5, RC=50):
+def simulate_policy(M, N, E_all, L_all, P_all, δ=5, RC=50):
    
     # prior bliefs
     μ_0 = np.full(K, 5500.0)      # prior mean
-    var_0 = np.full(K, 1200.0**2)  # prior variance
-    n_obs = np.zeros(K)             # number of observations for each alternativ
+    var_0 = np.full(K, 1200.0**2) # prior variance
+    # n_obs = np.zeros(K)           # number of observations for each alternative
 
     # Known variances
     σ_w = 1200 # Constant observation variance for all alternatives
@@ -153,34 +153,27 @@ def simulate_exploitation_policy(M, N, E_all, L_all, P_all, δ=5, RC=50):
     rng_master = np.random.default_rng(seed=123)
 
     # Run M experiments
-    for m in tqdm(range(M), desc=f"Running policy {policy_name}", ncols=100):
+    for m in tqdm(range(M), desc="Running", ncols=100):
         rng = np.random.default_rng(rng_master.integers(1e6)) # unique RNG per experiment
 
         μ = np.full(K, μ_0, dtype=np.float64)
         var = np.full(K, var_0, dtype=np.float64)
 
         for n in range(N):
-            # Choose best alternative so far
+            # Choose alternative based on the policy
+            # Exploration
+            choice = n % K
 
-            if policy_name == "exploration":
-                choice = n % K
+            # --- Exploitation ---
+            # choice = np.argmax(μ)
 
-            elif policy_name == "exploitation":
-                choice = np.argmax(μ)
+            #--- Epsilon-Greedy ---
+            # ε = ε₀ * (1 - n / N)
+            # choice = rng.integers(K) if rng.random() < ε else np.argmax(μ)
 
-            elif policy_name == "epsilon-greedy":
-                epsilon = epsilon_0 * (1 - n / N)
-                if rng.random() < epsilon:
-                    choice = rng.integers(K)
-                else:
-                    choice = np.argmax(μ)
-
-            elif policy_name == "kg":
-                kg_values = np.sqrt(var) * (σ_w / (σ_w + np.sqrt(var)))
-                choice = np.argmax(μ + kg_values)
-
-            else:
-                raise ValueError("Unknown policy")
+            # --- Knowledge Gradient ---
+            # KG = np.sqrt(σ²_alt) * (1200 / (1200 + np.sqrt(σ²_alt)))
+            # choice = np.argmax(μ + KG)
             
             γ1, γ2 = Y[choice]
 
@@ -208,7 +201,7 @@ M = 100  # Number of experiments
 N = 500  # Number of days to simulate
 
 E_all, L_all, P_all = sample_parameters(N, μ_L, μ_E, μ_P, δ, RC, T)
-selected_quality = simulate_exploitation_policy(M, N, E_all, L_all, P_all, δ=5, RC=50)
+selected_quality = simulate_policy(M, N, E_all, L_all, P_all, δ=5, RC=50)
 #simulate_many_days(E_all, L_all, P_all, γ1, γ2)
 
 results = {}
