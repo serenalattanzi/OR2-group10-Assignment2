@@ -89,7 +89,6 @@ def sample_parameters(N, μ_L, μ_E, μ_P, δ, RC, T=97):
 # Decision Rule Thresholds
 Y = [(γ1, γ2) for γ1 in range(22, 27) for γ2 in range(25, 31) if γ1 < γ2]
 K = len(Y)  # Total number of alternatives (27)
-selected_quality = np.zeros((M,N)) 
 
 #Simulate one day
 def simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
@@ -148,7 +147,7 @@ def simulate_policy(M, N, E_all, L_all, P_all, δ=5, RC=50):
     precision_matrix = np.zeros((M, N))
 
     # Epsilon for epsilon-greedy policy
-    epsilon_0 = 0.95
+    ε0 = 0.95
 
     rng_master = np.random.default_rng(seed=123)
 
@@ -162,18 +161,18 @@ def simulate_policy(M, N, E_all, L_all, P_all, δ=5, RC=50):
         for n in range(N):
             # Choose alternative based on the policy
             # Exploration
-            choice = n % K
+            #choice = rng.integers(K)
+        
+            # Exploitation ---
+            #choice = np.argmax(μ)
 
-            # --- Exploitation ---
-            # choice = np.argmax(μ)
-
-            #--- Epsilon-Greedy ---
-            # ε = ε₀ * (1 - n / N)
-            # choice = rng.integers(K) if rng.random() < ε else np.argmax(μ)
+            # Epsilon-Greedy ---
+           # ε = ε0 * (1 - n / N)
+            #choice = rng.integers(K) if rng.random() < ε else np.argmax(μ)
 
             # --- Knowledge Gradient ---
-            # KG = np.sqrt(σ²_alt) * (1200 / (1200 + np.sqrt(σ²_alt)))
-            # choice = np.argmax(μ + KG)
+           # KG = np.sqrt(var) * (1200 / (1200 + np.sqrt(var)))
+            #choice = np.argmax(μ + KG)
             
             γ1, γ2 = Y[choice]
 
@@ -201,21 +200,27 @@ M = 100  # Number of experiments
 N = 500  # Number of days to simulate
 
 E_all, L_all, P_all = sample_parameters(N, μ_L, μ_E, μ_P, δ, RC, T)
-selected_quality = simulate_policy(M, N, E_all, L_all, P_all, δ=5, RC=50)
-#simulate_many_days(E_all, L_all, P_all, γ1, γ2)
+avg_quality, var_quality, avg_precision = simulate_policy(M, N, E_all, L_all, P_all, δ=5, RC=50)
 
-results = {}
-for policy in ['exploration', 'exploitation', 'epsilon-greedy', 'kg']:
-    results[policy] = run_policy_offline(policy, E_all, L_all, P_all)
 
-import matplotlib.pyplot as plt
+# Save results to a CSV file
+import pandas as pd
 
-for policy in results:
-    plt.plot(results[policy][0], label=f"{policy} avg quality")
-plt.legend()
-plt.title("Average True Quality Over Time (Offline Learning)")
+df_results = pd.DataFrame({
+    'day': np.arange(1, N+1),
+    'avg_quality': avg_quality,
+    'variance': var_quality,
+    'precision': avg_precision
+})
+
+df_results.to_csv('offline_learning_results.csv', index=False)
+
+plt.plot(df_results['day'], df_results['avg_quality'], label='Average Quality')
+plt.title("Learning Curve of Exploration Policy")
 plt.xlabel("Day")
-plt.ylabel("Average Quality")
+plt.ylabel("Average Profit")
 plt.grid()
+plt.legend()
+plt.tight_layout()
 plt.show()
 
