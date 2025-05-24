@@ -101,7 +101,6 @@ true_df.set_index(['gamma 1', 'gamma 2'], inplace=True)
 true_quality = np.array([true_df.loc[(γ1, γ2), 'mean'] for (γ1, γ2) in Y])
 true_variance = np.array([true_df.loc[(γ1, γ2), 'variance'] for (γ1, γ2) in Y])
 
-
 #Simulate one day
 def simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
     R = 25
@@ -191,6 +190,8 @@ def simulate_policy(policy, M, N, E_all, L_all, P_all, δ=5, RC=50):
             quality_matrix[m, n] = true_quality[best]
 
     return quality_matrix
+
+# Run the simulation for all policies
 
 E_all, L_all, P_all = sample_parameters(M, N, μ_L, μ_E, μ_P, rng=MasterRNG, T=T)
 
