@@ -1,7 +1,6 @@
 #Required libraries
 import numpy as np  # Numerical operations and array handling
 import pandas as pd  # DataFrame handling and reading Excel files
-import openpyxl  # Excel file engine used by pandas for reading .xlsx files
 from scipy.stats import truncnorm  # To generate truncated normal distributions
 from tqdm import tqdm  # Progress bar for loops
 import matplotlib.pyplot as plt  # Plotting and visualization
