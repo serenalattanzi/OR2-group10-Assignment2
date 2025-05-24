@@ -16,16 +16,6 @@ means_df = pd.read_excel(path)
 means_df.head() # Visualize first rows
 print(means_df.head(10)) 
 
-# Given parameters
-δ = 5                   # δ: maximum energy flow per time step [kWh]
-RC = 50                 # RC: battery capacity [kWh]
-T = 97                  # T: number of time steps per day (15-minute intervals)
-
-# Means
-μ_L = means_df["load"].to_numpy()        # μ_L[t] = average load at time t
-μ_E = means_df["generation"].to_numpy()  # μ_E[t] = average generation at time t
-μ_P = means_df["price"].to_numpy()       # μ_P[t] = average market price at time t
-
 #FLOW VARIABLES
 #R   → battery level at time t [MWh]
 
@@ -41,9 +31,22 @@ T = 97                  # T: number of time steps per day (15-minute intervals)
 #xRM → battery to market  (R → M)
 
 #c_t → profit at time t [€]
-#C   → total daily profit [€]           
+#C   → total daily profit [€]   
 
-#Random Number Generatoryrs
+# Given parameters
+δ = 5    # Maximum energy flow per time step [kWh]
+RC = 50  # Battery capacity [kWh]
+T = 97   # Number of time steps per day (15-minute intervals)
+#Running
+M = 100  # Number of experiments
+N = 500  # Number of days to simulate
+
+# Means
+μ_L = means_df["load"].to_numpy()        # μ_L[t] = average load at time t
+μ_E = means_df["generation"].to_numpy()  # μ_E[t] = average generation at time t
+μ_P = means_df["price"].to_numpy()       # μ_P[t] = average market price at time t        
+
+#Random Number Generator
 MasterRNG = np.random.default_rng(seed=1)  #For reproducible stream of seeds
 
 #Truncated Normal Sampler
@@ -52,28 +55,27 @@ def sample_truncated_normal(mean, std, lower, upper, rng):
     b = (upper - mean) / std
     return truncnorm.rvs(a, b, loc=mean, scale=std, random_state=rng)
 
-#Samples creation
-def sample_parameters(N, μ_L, μ_E, μ_P, δ, RC, T=97):
-    rng = np.random.default_rng(seed=1)
+#Parameters sample creation
+def sample_parameters(M, N, μ_L, μ_E, μ_P, rng, T=97):
 
     #Generation
-    μ_E_mat = np.tile(μ_E, (N, 1))
+    μ_E_mat = np.tile(μ_E, (M, N, 1))
     E_std = np.sqrt(0.0625)
     E_low = μ_E_mat - 0.5
     E_high = μ_E_mat + 0.5
     E_t_all = truncnorm.rvs((E_low - μ_E_mat) / E_std, (E_high - μ_E_mat) / E_std,
-                            loc=μ_E_mat, scale=E_std, size=(N, T), random_state=rng)
+                            loc=μ_E_mat, scale=E_std, size=(M, N, T), random_state=rng)
     #Load
-    μ_L_mat = np.tile(μ_L, (N, 1))
+    μ_L_mat = np.tile(μ_L, (M, N, 1))
     L_std = np.sqrt(0.625)
     L_low = μ_L_mat - 3.75
     L_high = μ_L_mat + 3.75
     L_t_all = truncnorm.rvs((L_low - μ_L_mat) / L_std, (L_high - μ_L_mat) / L_std,
-                            loc=μ_L_mat, scale=L_std, size=(N, T), random_state=rng)
+                            loc=μ_L_mat, scale=L_std, size=(M, N, T), random_state=rng)
 
     #Price
-    μ_P_mat = np.tile(μ_P, (N, 1))
-    mix = rng.uniform(size=(N, T)) < 0.1
+    μ_P_mat = np.tile(μ_P, (M, N, 1))
+    mix = rng.uniform(size=(M, N, T)) < 0.1
     P_std = np.where(mix, np.sqrt(10000), np.sqrt(10))
     P_low = np.where(mix, μ_P_mat - 25, μ_P_mat - 50)
     P_high = np.where(mix, μ_P_mat + 200, μ_P_mat + 50)
@@ -82,13 +84,23 @@ def sample_parameters(N, μ_L, μ_E, μ_P, δ, RC, T=97):
         (P_low - μ_P_mat) / P_std,
         (P_high - μ_P_mat) / P_std,
         loc=μ_P_mat, scale=P_std,
-        size=(N, T), random_state=rng)
+        size=(M, N, T), random_state=rng)
     
     return E_t_all, L_t_all, P_t_all
 
 # Decision Rule Thresholds
 Y = [(γ1, γ2) for γ1 in range(22, 27) for γ2 in range(25, 31) if γ1 < γ2]
 K = len(Y)  # Total number of alternatives (27)
+
+#  Load true qualities from Excel 
+true_df = pd.read_excel("C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/true_qualities.xlsx")
+
+true_df.set_index(['gamma 1', 'gamma 2'], inplace=True)
+
+# Get ordered true quality and variance arrays matching Y
+true_quality = np.array([true_df.loc[(γ1, γ2), 'mean'] for (γ1, γ2) in Y])
+true_variance = np.array([true_df.loc[(γ1, γ2), 'variance'] for (γ1, γ2) in Y])
+
 
 #Simulate one day
 def simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
@@ -131,7 +143,7 @@ def simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
 
     return C
 
-def simulate_policy(M, N, E_all, L_all, P_all, δ=5, RC=50):
+def simulate_policy(policy, M, N, E_all, L_all, P_all, δ=5, RC=50):
    
     # prior bliefs
     μ_0 = np.full(K, 5500.0)      # prior mean
@@ -149,78 +161,53 @@ def simulate_policy(M, N, E_all, L_all, P_all, δ=5, RC=50):
     # Epsilon for epsilon-greedy policy
     ε0 = 0.95
 
-    rng_master = np.random.default_rng(seed=123)
-
     # Run M experiments
-    for m in tqdm(range(M), desc="Running", ncols=100):
-        rng = np.random.default_rng(rng_master.integers(1e6)) # unique RNG per experiment
 
-        μ = np.full(K, μ_0, dtype=np.float64)
-        var = np.full(K, var_0, dtype=np.float64)
+    for m in tqdm(range(M), desc=policy):
+        μ = μ_0.copy()
+        var = var_0.copy()
 
         for n in range(N):
-            # Choose alternative based on the policy
-            # Exploration
-            choice = rng.integers(K)
-        
-            # Exploitation ---
-            #choice = np.argmax(μ)
+            if policy == "exploration":
+                choice = np.random.randint(K)
+            elif policy == "exploitation":
+                choice = np.argmax(μ)
+            elif policy == "ε_greedy":
+                ε = ε0 * (1 - n / N)
+                choice = np.random.randint(K) if np.random.random() < ε else np.argmax(μ)
+            elif policy == "kg":
+                kg_bonus = np.sqrt(var) * (1200 / (1200 + np.sqrt(var)))
+                choice = np.argmax(μ + kg_bonus)
+            else:
+                raise ValueError("Unknown policy")
 
-            # Epsilon-Greedy ---
-           # ε = ε0 * (1 - n / N)
-            #choice = rng.integers(K) if rng.random() < ε else np.argmax(μ)
-
-            # --- Knowledge Gradient ---
-           # KG = np.sqrt(var) * (1200 / (1200 + np.sqrt(var)))
-            #choice = np.argmax(μ + KG)
-            
             γ1, γ2 = Y[choice]
+            profit = simulate_one_day(E_all[m, n], L_all[m, n], P_all[m, n], γ1, γ2)
 
-            # Simulate profit for this day using chosen (γ1, γ2)
-            profit = simulate_one_day(E_all[m], L_all[m], P_all[m], γ1, γ2, δ, RC)
-        
-            # Update belief for chosen alternative 
-            μ_old = μ[choice]
-            var_old = var[choice]
-            μ[choice] = (μ_old * var_w + profit * var_old) / (var_old + var_w)
-            var[choice] = (var_old * var_w) / (var_old + var_w)
+            μ[choice] = (μ[choice] * var_w + profit * var[choice]) / (var[choice] + var_w)
+            var[choice] = (var[choice] * var_w) / (var[choice] + var_w)
 
-            # Store results
-            quality_matrix[m, n] = profit
-            precision_matrix[m, n] = 1 / var[choice]
+            best = np.argmax(μ)
+            quality_matrix[m, n] = true_quality[best]
 
-    avg_quality = quality_matrix.mean(axis=0)
-    var_quality = quality_matrix.var(axis=0, ddof=1)
-    avg_precision = precision_matrix.mean(axis=0)
+    return quality_matrix
 
-    return avg_quality, var_quality, avg_precision
+E_all, L_all, P_all = sample_parameters(M, N, μ_L, μ_E, μ_P, rng=MasterRNG, T=T)
 
-#Running
-M = 100  # Number of experiments
-N = 500  # Number of days to simulate
+results = {}
+for policy in ["exploration", "exploitation", "ε_greedy", "kg"]:
+    results[policy] = simulate_policy(policy, M, N, E_all, L_all, P_all)
 
-E_all, L_all, P_all = sample_parameters(N, μ_L, μ_E, μ_P, δ, RC, T)
-avg_quality, var_quality, avg_precision = simulate_policy(M, N, E_all, L_all, P_all, δ=5, RC=50)
+plt.figure(figsize=(12, 6))
+for policy, matrix in results.items():
+    avg_curve = matrix.mean(axis=0)
+    plt.plot(avg_curve, label=policy.replace("_", " ").title())
 
-
-# Save results to a CSV file
-import pandas as pd
-
-df_results = pd.DataFrame({
-    'day': np.arange(1, N+1),
-    'avg_quality': avg_quality,
-    'variance': var_quality,
-    'precision': avg_precision
-})
-
-df_results.to_csv('offline_learning_results.csv', index=False)
-
-plt.plot(df_results['day'], df_results['avg_quality'], label='Average Quality')
-plt.title("Learning Curve of Exploration Policy")
+plt.title("Offline Learning — Average True Quality of Best Belief")
 plt.xlabel("Day")
-plt.ylabel("Average Profit")
-plt.grid()
+plt.ylabel("True Quality")
 plt.legend()
+plt.grid(True)
 plt.tight_layout()
 plt.show()
 
