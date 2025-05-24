@@ -161,7 +161,7 @@ def simulate_policy(M, N, E_all, L_all, P_all, δ=5, RC=50):
         for n in range(N):
             # Choose alternative based on the policy
             # Exploration
-            #choice = rng.integers(K)
+            choice = rng.integers(K)
         
             # Exploitation ---
             #choice = np.argmax(μ)
