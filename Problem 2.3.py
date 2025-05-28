@@ -18,7 +18,11 @@ Y = [(γ1, γ2) for γ1 in range(22, 27) for γ2 in range(25, 31) if γ1 < γ2]
 K = len(Y)
 
 # Load daily average profiles
+#Serena
 means_df = pd.read_excel("C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/means.xlsx")
+# Alice
+#means_df = pd.read_excel("C:/Users/alilo/OneDrive - University of Twente/1 ANNO/quartile 4/means.xlsx")
+
 μ_L = means_df["load"].to_numpy()
 μ_E = means_df["generation"].to_numpy()
 μ_P = means_df["price"].to_numpy()
