@@ -202,6 +202,7 @@ def simulate_policy_offline(policy, M, N, E_all, L_all, P_all, δ=5, RC=50):
 # Run the simulation for all policies
 
 E_all, L_all, P_all = sample_parameters(M, N, μ_L, μ_E, μ_P, rng=MasterRNG, T=T)
+seeds = MasterRNG.integers(0, 1e9, size=M)  # FIX: generate seeds for reproducibility
 
 results = {}
 for policy in ["exploration", "exploitation", "ε_greedy", "kg"]:
