@@ -8,9 +8,9 @@ import matplotlib.pyplot as plt  # Plotting and visualization
 #DATA INPUT
 # Insert file to the excel file here
 # Serena
-path = "C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/means.xlsx"
+#path = "C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/means.xlsx"
 # Alice
-#path = "C:/Users/alilo\OneDrive - University of Twente/1 ANNO/quartile 4/means.xlsx"
+path = "C:/Users/alilo/OneDrive - University of Twente/1 ANNO/quartile 4/means.xlsx"
 means_df = pd.read_excel(path)
 means_df.head() # Visualize first rows
 print(means_df.head(10)) 
@@ -92,7 +92,8 @@ Y = [(γ1, γ2) for γ1 in range(22, 27) for γ2 in range(25, 31) if γ1 < γ2]
 K = len(Y)  # Total number of alternatives (27)
 
 #  Load true qualities from Excel 
-true_df = pd.read_excel("C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/true_qualities.xlsx")
+#true_df = pd.read_excel("C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/true_qualities.xlsx")
+true_df = pd.read_excel("C:/Users/alilo/OneDrive - University of Twente/1 ANNO/quartile 4/true_qualities.xlsx")
 
 true_df.set_index(['gamma 1', 'gamma 2'], inplace=True)
 
@@ -164,15 +165,23 @@ def simulate_policy_offline(policy, M, N, E_all, L_all, P_all, δ=5, RC=50):
     for m in tqdm(range(M), desc=policy):
         μ = μ_0.copy()
         var = var_0.copy()
-
+        rng = np.random.default_rng(seeds[m])  # new seed for each experiment
+    
         for n in range(N):
             if policy == "exploration":
                 choice = np.random.randint(K)
             elif policy == "exploitation":
                 choice = np.argmax(μ)
             elif policy == "ε_greedy":
-                ε = ε0 * (1 - n / N)
-                choice = np.random.randint(K) if np.random.random() < ε else np.argmax(μ)
+                # ε = ε0 * (1 - n / N)
+                # choice = rng.integers(K) if rng.random() < ε else np.argmax(μ
+
+                c = 0.95  # pick any constant in (0, 1)
+                ε = c / (n + 1)  # +1 to avoid div by zero
+                if rng.random() < ε:
+                    choice = rng.integers(K)  # explore
+                else:
+                   choice = np.argmax(μ)  # exploit
             elif policy == "kg":
                 kg_bonus = np.sqrt(var) * (1200 / (1200 + np.sqrt(var)))
                 choice = np.argmax(μ + kg_bonus)
@@ -196,7 +205,7 @@ E_all, L_all, P_all = sample_parameters(M, N, μ_L, μ_E, μ_P, rng=MasterRNG, T
 
 results = {}
 for policy in ["exploration", "exploitation", "ε_greedy", "kg"]:
-    results[policy] = simulate_policy(policy, M, N, E_all, L_all, P_all)
+    results[policy] = simulate_policy_offline(policy, M, N, E_all, L_all, P_all)
 
 plt.figure(figsize=(12, 6))
 for policy, matrix in results.items():
