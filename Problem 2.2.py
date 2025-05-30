@@ -7,25 +7,24 @@ import matplotlib.pyplot as plt
 
 #Data Input
 path = "C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/means.xlsx"
-# Alice
 #path = "C:/Users/alilo/OneDrive - University of Twente/1 ANNO/quartile 4/means.xlsx"
 means_df = pd.read_excel(path)
 means_df.head() # Visualize first rows
 print(means_df.head(10)) 
-
-# Given parameters
-δ = 5    # Maximum energy flow per time step [kWh]
-RC = 50  # Battery capacity [kWh]
-T = 97   # Number of time steps per day (15-minute intervals)
-#Running
-M = 100  # Number of experiments
-N = 500  # Number of days to simulate
 
 # Means
 μ_L = means_df["load"].to_numpy()        # μ_L[t] = average load at time t
 μ_E = means_df["generation"].to_numpy()  # μ_E[t] = average generation at time t
 μ_P = means_df["price"].to_numpy()       # μ_P[t] = average market price at time t        
 
+# Given parameters
+δ = 5    # Maximum energy flow per time step [kWh]
+RC = 50  # Battery capacity [kWh]
+T = 97   # Number of time steps per day (15-minute intervals)
+
+#Running
+M = 100  # Number of experiments
+N = 500  # Number of days to simulate
 
 #Parameters sample creation
 def sample_parameters(M, N, μ_L, μ_E, μ_P, rng, T=97):
@@ -57,10 +56,9 @@ def sample_parameters(M, N, μ_L, μ_E, μ_P, rng, T=97):
 Y = [(γ1, γ2) for γ1 in range(22, 27) for γ2 in range(25, 31) if γ1 < γ2]
 K = len(Y)  # Total number of alternatives (27)
 
-#  Load true qualities from Excel 
+# True qualities input 
 true_df = pd.read_excel("C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/true_qualities.xlsx")
 #true_df = pd.read_excel("C:/Users/alilo/OneDrive - University of Twente/1 ANNO/quartile 4/true_qualities.xlsx")
-
 true_df.set_index(['gamma 1', 'gamma 2'], inplace=True)
 
 # Get ordered true quality and variance arrays matching Y
@@ -109,17 +107,15 @@ def simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
     return C
 
 def simulate_policy_offline(policy, M, N, E_all, L_all, P_all, δ=5, RC=50):
-   
-    # prior bliefs
+    #Prior beliefs
     μ_0 = np.full(K, 5500.0)      # prior mean
     var_0 = np.full(K, 1200.0**2) # prior variance
-    # n_obs = np.zeros(K)           # number of observations for each alternative
 
     # Known variances
     σ_w = 1200 # Constant observation variance for all alternatives
     var_w = σ_w**2  
 
-    # storage
+    # Storage
     quality_matrix = np.zeros((M, N))
 
     # Epsilon for epsilon-greedy policy
@@ -130,7 +126,7 @@ def simulate_policy_offline(policy, M, N, E_all, L_all, P_all, δ=5, RC=50):
     for m in tqdm(range(M), desc=policy):
         μ = μ_0.copy()
         var = var_0.copy()
-        rng = np.random.default_rng(seeds[m])  # new seed for each experiment
+        rng = np.random.default_rng(seeds[m])  # New seed for each experiment
     
         for n in range(N):
             if policy == "exploration":
@@ -138,10 +134,7 @@ def simulate_policy_offline(policy, M, N, E_all, L_all, P_all, δ=5, RC=50):
             elif policy == "exploitation":
                 choice = np.argmax(μ)
             elif policy == "ε_greedy":
-                # ε = ε0 * (1 - n / N)
-                # choice = rng.integers(K) if rng.random() < ε else np.argmax(μ
-
-                c = 0.95  # pick any constant in (0, 1)
+                c = 0.95  
                 ε = c / (n + 1)  # +1 to avoid div by zero
                 if rng.random() < ε:
                     choice = rng.integers(K)  # explore
@@ -190,18 +183,18 @@ def simulate_policy_offline(policy, M, N, E_all, L_all, P_all, δ=5, RC=50):
 
     return quality_matrix
 
-# Run the simulation for all policies
-
 #Random Number Generator
 MasterRNG = np.random.default_rng(seed=1) 
 seeds = MasterRNG.integers(0, 1e9, size=M) 
 
 E_all, L_all, P_all = sample_parameters(M, N, μ_L, μ_E, μ_P, rng=MasterRNG, T=T)
 
+#Run the simulation for all policies
 results = {}
 for policy in ["exploration", "exploitation", "ε_greedy", "kg"]:
     results[policy] = simulate_policy_offline(policy, M, N, E_all, L_all, P_all)
 
+# Graph for the results
 plt.figure(figsize=(12, 6))
 for policy, matrix in results.items():
     avg_curve = matrix.mean(axis=0)

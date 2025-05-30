@@ -167,19 +167,18 @@ def simulate_policy_online(policy, M, N, E_all, L_all, P_all, true_quality, seed
 
     return quality_matrix
 
-# Set up controlled seed stream for reproducibility
+# Set up seeds for reproducibility
 MasterRNG = np.random.default_rng(seed=1)
 seeds = MasterRNG.integers(0, 1e9, size=M)
 
-# Generate shared random scenarios
 E_all, L_all, P_all = sample_parameters(M, N, μ_L, μ_E, μ_P, rng=MasterRNG)
 
-# Run and collect results
+# Run the simulation for all policies
 results_online = {}
 for policy in ["exploration", "exploitation", "ε_greedy", "kg"]:
     results_online[policy] = simulate_policy_online(policy, M, N, E_all, L_all, P_all, true_quality, seeds)
 
-# Plot
+# Graph for the results
 plt.figure(figsize=(12, 6))
 for policy, matrix in results_online.items():
     avg_curve = matrix.mean(axis=0)
