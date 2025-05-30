@@ -5,36 +5,29 @@ from scipy.stats import truncnorm  # To generate truncated normal distributions
 from tqdm import tqdm  # Progress bar for loops
 import matplotlib.pyplot as plt  # Plotting and visualization
 
-#DATA INPUT
-
+#Data Input
 path = "C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/means.xlsx"
 #path = "C:/Users/alilo\OneDrive - University of Twente/1 ANNO/quartile 4/means.xlsx"
 means_df = pd.read_excel(path)
 means_df.head() # Visualize first rows
 print(means_df.head(10)) 
 
-# Given parameters
-δ = 5                   # δ: maximum energy flow per time step [kWh]
-RC = 50                 # RC: battery capacity [kWh]
-T = 97                  # T: number of time steps per day (15-minute intervals)
-
 # Means
 μ_L = means_df["load"].to_numpy()        # μ_L[t] = average load at time t
 μ_E = means_df["generation"].to_numpy()  # μ_E[t] = average generation at time t
 μ_P = means_df["price"].to_numpy()       # μ_P[t] = average market price at time t
 
-#Random Number Generator
-MasterRNG = np.random.default_rng(seed=1)  #For reproducible stream of seeds
+# Given parameters
+δ = 5                   # δ: maximum energy flow per time step [kWh]
+RC = 50                 # RC: battery capacity [kWh]
+T = 97                  # T: number of time steps per day (15-minute intervals)
 
 # Decision Rule Thresholds
-# Definition of the 27 alternatives
-alts = [(γ1, γ2) for γ1 in range(22, 27) for γ2 in range(25, 31) if γ1 < γ2]
-
-#γ1 = 23                 # γ₁: price threshold to start buying (from market or storing excess generation)
-#γ2 = 26                 # γ₂: price threshold to start selling (from battery to market)
+alts = [(γ1, γ2) for γ1 in range(22, 27) for γ2 in range(25, 31) if γ1 < γ2]  # Definition of the 27 alternatives
 
 #Samples creation
 def samples_matrix(N, μ_L, μ_E, μ_P, δ, RC, T=97):
+    #Random Number Generator
     rng = np.random.default_rng(seed=1)
 
     #Generation
@@ -42,15 +35,14 @@ def samples_matrix(N, μ_L, μ_E, μ_P, δ, RC, T=97):
     E_std = np.sqrt(0.0625)
     E_low = μ_E_mat - 0.5
     E_high = μ_E_mat + 0.5
-    E_t_all = truncnorm.rvs((E_low - μ_E_mat) / E_std, (E_high - μ_E_mat) / E_std,
-                            loc=μ_E_mat, scale=E_std, size=(N, T), random_state=rng)
+    E_t_all = truncnorm.rvs((E_low - μ_E_mat) / E_std, (E_high - μ_E_mat) / E_std, loc=μ_E_mat, scale=E_std, size=(N, T), random_state=rng)
+
     #Load
     μ_L_mat = np.tile(μ_L, (N, 1))
     L_std = np.sqrt(0.625)
     L_low = μ_L_mat - 3.75
     L_high = μ_L_mat + 3.75
-    L_t_all = truncnorm.rvs((L_low - μ_L_mat) / L_std, (L_high - μ_L_mat) / L_std,
-                            loc=μ_L_mat, scale=L_std, size=(N, T), random_state=rng)
+    L_t_all = truncnorm.rvs((L_low - μ_L_mat) / L_std, (L_high - μ_L_mat) / L_std, loc=μ_L_mat, scale=L_std, size=(N, T), random_state=rng)
 
     #Price
     μ_P_mat = np.tile(μ_P, (N, 1))
@@ -58,13 +50,8 @@ def samples_matrix(N, μ_L, μ_E, μ_P, δ, RC, T=97):
     P_std = np.where(mix, np.sqrt(10000), np.sqrt(10))
     P_low = np.where(mix, μ_P_mat - 25, μ_P_mat - 50)
     P_high = np.where(mix, μ_P_mat + 200, μ_P_mat + 50)
+    P_t_all = truncnorm.rvs((P_low - μ_P_mat) / P_std, (P_high - μ_P_mat) / P_std, loc=μ_P_mat, scale=P_std, size=(N, T), random_state=rng)
 
-    P_t_all = truncnorm.rvs(
-        (P_low - μ_P_mat) / P_std,
-        (P_high - μ_P_mat) / P_std,
-        loc=μ_P_mat, scale=P_std,
-        size=(N, T), random_state=rng
-    )
     return E_t_all, L_t_all, P_t_all
 
 #Simulate one day
@@ -121,9 +108,7 @@ def simulate_many_days(E_all, L_all, P_all, γ1, γ2, δ=5, RC=50):
     variance_profit = np.var(profits, ddof=1)
     return mean_profit, variance_profit
 
-
-def evaluate_all_alternatives(E_all, L_all, P_all, δ=5, RC=50):
-    
+def evaluate_all_alternatives(E_all, L_all, P_all, δ=5, RC=50): 
     results = []
     alternatives = [(γ1, γ2) for γ1 in range(22, 27) for γ2 in range(25, 31) if γ1 < γ2]
 
@@ -134,12 +119,10 @@ def evaluate_all_alternatives(E_all, L_all, P_all, δ=5, RC=50):
     df = pd.DataFrame(results, columns=["γ1", "γ2", "mean_profit", "variance_profit"])
     return df
 
-
 #Running
 N = 1000000  
 
 E_all, L_all, P_all = samples_matrix(N, μ_L, μ_E, μ_P, δ, RC, T)
-
 results_df = evaluate_all_alternatives(E_all, L_all, P_all, δ, RC)
 
 # Save results to CSV
