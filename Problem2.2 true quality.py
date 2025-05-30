@@ -1,16 +1,13 @@
 #Required libraries
 import numpy as np  # Numerical operations and array handling
 import pandas as pd  # DataFrame handling and reading Excel files
-import openpyxl  # Excel file engine used by pandas for reading .xlsx files
 from scipy.stats import truncnorm  # To generate truncated normal distributions
 from tqdm import tqdm  # Progress bar for loops
 import matplotlib.pyplot as plt  # Plotting and visualization
 
 #DATA INPUT
-# Insert file to the excel file here
-# Serena
+
 path = "C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/means.xlsx"
-# Alice
 #path = "C:/Users/alilo\OneDrive - University of Twente/1 ANNO/quartile 4/means.xlsx"
 means_df = pd.read_excel(path)
 means_df.head() # Visualize first rows
@@ -26,31 +23,8 @@ T = 97                  # T: number of time steps per day (15-minute intervals)
 μ_E = means_df["generation"].to_numpy()  # μ_E[t] = average generation at time t
 μ_P = means_df["price"].to_numpy()       # μ_P[t] = average market price at time t
 
-#FLOW VARIABLES
-#R   → battery level at time t [MWh]
-
-#P   → price at time t [€/MWh]
-#L   → load (demand) at time t [MWh]
-#E   → solar generation at time t [MWh]
-
-#xEL → solar to load      (E → L)
-#xRL → battery to load    (R → L)
-#xML → market to load     (M → L)
-#xER → solar to battery   (E → R)
-#xMR → market to battery  (M → R)
-#xRM → battery to market  (R → M)
-
-#c_t → profit at time t [€]
-#C   → total daily profit [€]
-
 #Random Number Generator
 MasterRNG = np.random.default_rng(seed=1)  #For reproducible stream of seeds
-
-#Truncated Normal Sampler
-def sample_truncated_normal(mean, std, lower, upper, rng):
-    a = (lower - mean) / std
-    b = (upper - mean) / std
-    return truncnorm.rvs(a, b, loc=mean, scale=std, random_state=rng)
 
 # Decision Rule Thresholds
 # Definition of the 27 alternatives
@@ -164,7 +138,7 @@ def evaluate_all_alternatives(E_all, L_all, P_all, δ=5, RC=50):
 #Running
 N = 1000000  
 
-E_all, L_all, P_all = samples_matrix(N, μ_L, μ_E, μ_P,  δ, RC, T)
+E_all, L_all, P_all = samples_matrix(N, μ_L, μ_E, μ_P, δ, RC, T)
 
 results_df = evaluate_all_alternatives(E_all, L_all, P_all, δ, RC)
 

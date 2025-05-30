@@ -22,7 +22,6 @@ K = len(Y)
 means_df = pd.read_excel("C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/means.xlsx")
 # Alice
 #means_df = pd.read_excel("C:/Users/alilo/OneDrive - University of Twente/1 ANNO/quartile 4/means.xlsx")
-
 μ_L = means_df["load"].to_numpy()
 μ_E = means_df["generation"].to_numpy()
 μ_P = means_df["price"].to_numpy()
@@ -33,55 +32,77 @@ true_df = pd.read_excel("C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignme
 true_df.set_index(['gamma 1', 'gamma 2'], inplace=True)
 true_quality = np.array([true_df.loc[(γ1, γ2), 'mean'] for (γ1, γ2) in Y])
 
+# Sampling Parameters
 def sample_parameters(M, N, μ_L, μ_E, μ_P, rng, T=97):
+
+    #Generation
     μ_E_mat = np.tile(μ_E, (M, N, 1))
     E_std = np.sqrt(0.0625)
     E_low = μ_E_mat - 0.5
     E_high = μ_E_mat + 0.5
-    E = truncnorm.rvs((E_low - μ_E_mat) / E_std, (E_high - μ_E_mat) / E_std,
-                      loc=μ_E_mat, scale=E_std, size=(M, N, T), random_state=rng)
-
+    E_t_all = truncnorm.rvs((E_low - μ_E_mat) / E_std, (E_high - μ_E_mat) / E_std, loc=μ_E_mat, scale=E_std, size=(M, N, T), random_state=rng)
+    
+    #Load
     μ_L_mat = np.tile(μ_L, (M, N, 1))
     L_std = np.sqrt(0.625)
     L_low = μ_L_mat - 3.75
     L_high = μ_L_mat + 3.75
-    L = truncnorm.rvs((L_low - μ_L_mat) / L_std, (L_high - μ_L_mat) / L_std,
-                      loc=μ_L_mat, scale=L_std, size=(M, N, T), random_state=rng)
+    L_t_all = truncnorm.rvs((L_low - μ_L_mat) / L_std, (L_high - μ_L_mat) / L_std, loc=μ_L_mat, scale=L_std, size=(M, N, T), random_state=rng)
 
+    #Price
     μ_P_mat = np.tile(μ_P, (M, N, 1))
     mix = rng.uniform(size=(M, N, T)) < 0.1
     P_std = np.where(mix, np.sqrt(10000), np.sqrt(10))
     P_low = np.where(mix, μ_P_mat - 25, μ_P_mat - 50)
     P_high = np.where(mix, μ_P_mat + 200, μ_P_mat + 50)
-    P = truncnorm.rvs((P_low - μ_P_mat) / P_std, (P_high - μ_P_mat) / P_std,
-                      loc=μ_P_mat, scale=P_std, size=(M, N, T), random_state=rng)
-
-    return E, L, P
+    P_t_all = truncnorm.rvs((P_low - μ_P_mat) / P_std, (P_high - μ_P_mat) / P_std, loc=μ_P_mat, scale=P_std, size=(M, N, T), random_state=rng)
+    
+    return E_t_all, L_t_all, P_t_all
 
 def simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
+
     R = 25
     C = 0
-    for t in range(len(E_t)):
-        E_raw, L, P = E_t[t], L_t[t], P_t[t]
-        E_plus, E_minus = max(0, E_raw), -min(0, E_raw)
-        dont_charge = R >= (96 - t) * δ
+    T = E_t.shape[0]
+
+    for t in range(T):
+        E_raw = E_t[t]
+        L = L_t[t]
+        P = P_t[t]
+
+        E_plus = max(0, E_raw)
+        E_minus = -min(0, E_raw)
+        dont_charge = R >= (96 - t) * δ 
 
         xEL = min(E_plus, L + E_minus)
         xRL = min(L + E_minus - xEL, R, δ) if P >= γ2 else 0
         xML = L + E_minus - xEL - xRL
         xER = min(E_plus - xEL, δ, RC - R)
 
-        xMR = min(RC - R - xER, δ - xER) if P <= γ1 and not dont_charge else 0
-        xRM = min(δ - xRL, R - xRL) if (dont_charge and P > 0) or (P >= γ2) else 0
+        if P <= γ1 and not dont_charge:
+            xMR = min(RC - R - xER, δ - xER)
+        elif dont_charge and P < 0:
+            xMR = min(RC - R - xER, δ - xER)
+        else:
+            xMR = 0
 
-        R = min(RC, max(0, R + xER + xMR - xRL - xRM))
-        C += P * (xRM + L) - P * (xML + xMR)
+        if dont_charge and P > 0:
+            xRM = min(δ - xRL, R - xRL)
+        elif P >= γ2:
+            xRM = min(δ - xRL, R - xRL)
+        else:
+            xRM = 0
+        R = R + xER + xMR - xRL - xRM
+        R = min(RC, max(0, R))  
+
+        c = P * (xRM + L) - P * (xML + xMR)
+        C += c
+
     return C
 
 def simulate_policy_online(policy, M, N, E_all, L_all, P_all, true_quality, seeds, δ=5, RC=50):
     ε0 = 0.95
     quality_matrix = np.zeros((M, N))
-    from scipy.stats import norm  # import necessario per h(z)
 
     for m in tqdm(range(M), desc=f"{policy}"):
         μ = np.full(K, 5500.0)
@@ -142,16 +163,16 @@ def simulate_policy_online(policy, M, N, E_all, L_all, P_all, true_quality, seed
             μ[choice] = (μ[choice] * var_w + profit * var[choice]) / (var[choice] + var_w)
             var[choice] = (var[choice] * var_w) / (var[choice] + var_w)
 
-            quality_matrix[m, n] = true_quality[choice]  # ✅ log chosen alternative's quality
+            quality_matrix[m, n] = true_quality[choice]
 
     return quality_matrix
 
 # Set up controlled seed stream for reproducibility
-rng_global = np.random.default_rng(seed=42)
-seeds = rng_global.integers(0, 1e9, size=M)
+MasterRNG = np.random.default_rng(seed=1)
+seeds = MasterRNG.integers(0, 1e9, size=M)
 
 # Generate shared random scenarios
-E_all, L_all, P_all = sample_parameters(M, N, μ_L, μ_E, μ_P, rng=rng_global)
+E_all, L_all, P_all = sample_parameters(M, N, μ_L, μ_E, μ_P, rng=MasterRNG)
 
 # Run and collect results
 results_online = {}

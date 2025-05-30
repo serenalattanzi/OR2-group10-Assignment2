@@ -1,36 +1,17 @@
 #Required libraries
-import numpy as np  # Numerical operations and array handling
-import pandas as pd  # DataFrame handling and reading Excel files
-from scipy.stats import truncnorm, norm  # To generate truncated normal distributions
-from tqdm import tqdm  # Progress bar for loops
-import matplotlib.pyplot as plt  # Plotting and visualization
+import numpy as np
+import pandas as pd  
+from scipy.stats import truncnorm, norm  
+from tqdm import tqdm  
+import matplotlib.pyplot as plt 
 
-#DATA INPUT
-# Insert file to the excel file here
-# Serena
+#Data Input
 path = "C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/means.xlsx"
 # Alice
 #path = "C:/Users/alilo/OneDrive - University of Twente/1 ANNO/quartile 4/means.xlsx"
 means_df = pd.read_excel(path)
 means_df.head() # Visualize first rows
 print(means_df.head(10)) 
-
-#FLOW VARIABLES
-#R   → battery level at time t [MWh]
-
-#P   → price at time t [€/MWh]
-#L   → load (demand) at time t [MWh]
-#E   → solar generation at time t [MWh]
-
-#xEL → solar to load      (E → L)
-#xRL → battery to load    (R → L)
-#xML → market to load     (M → L)
-#xER → solar to battery   (E → R)
-#xMR → market to battery  (M → R)
-#xRM → battery to market  (R → M)
-
-#c_t → profit at time t [€]
-#C   → total daily profit [€]   
 
 # Given parameters
 δ = 5    # Maximum energy flow per time step [kWh]
@@ -45,14 +26,6 @@ N = 500  # Number of days to simulate
 μ_E = means_df["generation"].to_numpy()  # μ_E[t] = average generation at time t
 μ_P = means_df["price"].to_numpy()       # μ_P[t] = average market price at time t        
 
-#Random Number Generator
-MasterRNG = np.random.default_rng(seed=1)  #For reproducible stream of seeds
-
-#Truncated Normal Sampler
-def sample_truncated_normal(mean, std, lower, upper, rng):
-    a = (lower - mean) / std
-    b = (upper - mean) / std
-    return truncnorm.rvs(a, b, loc=mean, scale=std, random_state=rng)
 
 #Parameters sample creation
 def sample_parameters(M, N, μ_L, μ_E, μ_P, rng, T=97):
@@ -62,15 +35,13 @@ def sample_parameters(M, N, μ_L, μ_E, μ_P, rng, T=97):
     E_std = np.sqrt(0.0625)
     E_low = μ_E_mat - 0.5
     E_high = μ_E_mat + 0.5
-    E_t_all = truncnorm.rvs((E_low - μ_E_mat) / E_std, (E_high - μ_E_mat) / E_std,
-                            loc=μ_E_mat, scale=E_std, size=(M, N, T), random_state=rng)
+    E_t_all = truncnorm.rvs((E_low - μ_E_mat) / E_std, (E_high - μ_E_mat) / E_std, loc=μ_E_mat, scale=E_std, size=(M, N, T), random_state=rng)
     #Load
     μ_L_mat = np.tile(μ_L, (M, N, 1))
     L_std = np.sqrt(0.625)
     L_low = μ_L_mat - 3.75
     L_high = μ_L_mat + 3.75
-    L_t_all = truncnorm.rvs((L_low - μ_L_mat) / L_std, (L_high - μ_L_mat) / L_std,
-                            loc=μ_L_mat, scale=L_std, size=(M, N, T), random_state=rng)
+    L_t_all = truncnorm.rvs((L_low - μ_L_mat) / L_std, (L_high - μ_L_mat) / L_std, loc=μ_L_mat, scale=L_std, size=(M, N, T), random_state=rng)
 
     #Price
     μ_P_mat = np.tile(μ_P, (M, N, 1))
@@ -78,12 +49,7 @@ def sample_parameters(M, N, μ_L, μ_E, μ_P, rng, T=97):
     P_std = np.where(mix, np.sqrt(10000), np.sqrt(10))
     P_low = np.where(mix, μ_P_mat - 25, μ_P_mat - 50)
     P_high = np.where(mix, μ_P_mat + 200, μ_P_mat + 50)
-
-    P_t_all = truncnorm.rvs(
-        (P_low - μ_P_mat) / P_std,
-        (P_high - μ_P_mat) / P_std,
-        loc=μ_P_mat, scale=P_std,
-        size=(M, N, T), random_state=rng)
+    P_t_all = truncnorm.rvs((P_low - μ_P_mat) / P_std, (P_high - μ_P_mat) / P_std, loc=μ_P_mat, scale=P_std, size=(M, N, T), random_state=rng)
     
     return E_t_all, L_t_all, P_t_all
 
@@ -155,7 +121,6 @@ def simulate_policy_offline(policy, M, N, E_all, L_all, P_all, δ=5, RC=50):
 
     # storage
     quality_matrix = np.zeros((M, N))
-    precision_matrix = np.zeros((M, N))
 
     # Epsilon for epsilon-greedy policy
     ε0 = 0.95
@@ -227,8 +192,11 @@ def simulate_policy_offline(policy, M, N, E_all, L_all, P_all, δ=5, RC=50):
 
 # Run the simulation for all policies
 
+#Random Number Generator
+MasterRNG = np.random.default_rng(seed=1) 
+seeds = MasterRNG.integers(0, 1e9, size=M) 
+
 E_all, L_all, P_all = sample_parameters(M, N, μ_L, μ_E, μ_P, rng=MasterRNG, T=T)
-seeds = MasterRNG.integers(0, 1e9, size=M)  # FIX: generate seeds for reproducibility
 
 results = {}
 for policy in ["exploration", "exploitation", "ε_greedy", "kg"]:
