@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.stats import truncnorm
+from scipy.stats import truncnorm, norm
 from tqdm import tqdm
 
 # General simulation settings
@@ -105,23 +105,35 @@ def simulate_policy_online(policy, M, N, E_all, L_all, P_all, true_quality, seed
                    choice = np.argmax(μ)  # exploit
 
             elif policy == "kg":
-                tilde_sigma = np.sqrt((var * var_w) / (var + var_w))
+                # Step 1: Compute tilde_sigma_i
+                beta = 1 / var
+                beta_w = 1 / var_w
+                sigma2_tilde = (1 / beta) - (1 / (beta + beta_w))
+                tilde_sigma = np.sqrt(sigma2_tilde)
 
-                # Compute μ_star: max of μ excluding self
-                μ_matrix = np.tile(μ, (K, 1))      # K x K matrix
+                # Step 2: Compute μ_star = max_{j ≠ i} μ_j for each i
+                μ_matrix = np.tile(μ, (K, 1))  # shape (K, K)
                 np.fill_diagonal(μ_matrix, -np.inf)
-                μ_star = μ_matrix.max(axis=1)      # Vector of best μ excluding i
+                μ_star = μ_matrix.max(axis=1)
 
-                # Compute zeta
-                zeta = -(μ - μ_star) / tilde_sigma
+                # Step 3: ζ_i = -|μ_i - μ_star| / tilde_sigma_i
+                zeta = -np.abs(μ - μ_star) / tilde_sigma
 
-                # KG value: ν_kg = tilde_sigma * f(zeta)
+                # Step 4: f(ζ) = ζ Φ(ζ) + φ(ζ)
                 f_zeta = zeta * norm.cdf(zeta) + norm.pdf(zeta)
+
+                # Step 5: ν_KG = tilde_sigma * f(ζ)
                 ν_kg = tilde_sigma * f_zeta
 
-                # Final score for online KG
+                # Step 6: OKG Score
                 score = μ + (N - n) * ν_kg
-                choice = np.argmax(score)
+
+                # Step 7: Choose best with tie-breaking
+                max_score = np.max(score)
+                best_candidates = np.flatnonzero(score == max_score)
+                choice = rng.choice(best_candidates)
+
+
 
 
 
@@ -169,9 +181,9 @@ for policy, matrix in results_online.items():
     avg_curve = matrix.mean(axis=0)
     plt.plot(avg_curve, label=policy.replace("_", " ").title())
 
-plt.title("Online Learning — Avg. True Quality of Sampled Alternative")
+plt.title("Online Learning")
 plt.xlabel("Day")
-plt.ylabel("True Quality of Action Taken")
+plt.ylabel("Quality")
 plt.legend()
 plt.grid(True)
 plt.tight_layout()

@@ -183,15 +183,33 @@ def simulate_policy_offline(policy, M, N, E_all, L_all, P_all, δ=5, RC=50):
                 else:
                    choice = np.argmax(μ)  # exploit
             elif policy == "kg":
-                tilde_sigma = np.sqrt((var * var_w) / (var + var_w))
-                μ_matrix = np.tile(μ, (K, 1))
+                # Step 1: Compute tilde_sigma_i
+                beta = 1 / var
+                beta_w = 1 / var_w
+                sigma2_tilde = (1 / beta) - (1 / (beta + beta_w))
+                tilde_sigma = np.sqrt(sigma2_tilde)
+
+                # Step 2: Compute μ_star = max(μ[j ≠ i]) for each i
+                μ_matrix = np.tile(μ, (K, 1))  # K x K
                 np.fill_diagonal(μ_matrix, -np.inf)
-                μ_star = μ_matrix.max(axis=1)
+                μ_star = μ_matrix.max(axis=1)  # vector of max for j ≠ i
+
+                # Step 3: Compute zeta = -|μ_i - μ_star| / tilde_sigma
                 zeta = -np.abs(μ - μ_star) / tilde_sigma
+
+                # Step 4: f(zeta) = ζΦ(ζ) + φ(ζ)
                 f_zeta = zeta * norm.cdf(zeta) + norm.pdf(zeta)
+
+                # Step 5: Compute ν_KG = tilde_sigma * f(zeta)
                 ν_kg = tilde_sigma * f_zeta
-                score = μ + ν_kg
-                choice = np.argmax(score)
+
+                # Step 6: Final KG score
+                score = ν_kg  # or μ + ν_kg if you prefer to include prior means
+
+                # Step 7: Choose best, with tie-breaking
+                max_score = np.max(score)
+                best_candidates = np.flatnonzero(score == max_score)
+                choice = rng.choice(best_candidates)
 
             else:
                 raise ValueError("Unknown policy")
