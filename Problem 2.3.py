@@ -19,17 +19,17 @@ K = len(Y)
 
 # Load daily average profiles
 #Serena
-#means_df = pd.read_excel("C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/means.xlsx")
+means_df = pd.read_excel("C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/means.xlsx")
 # Alice
-means_df = pd.read_excel("C:/Users/alilo/OneDrive - University of Twente/1 ANNO/quartile 4/means.xlsx")
+#means_df = pd.read_excel("C:/Users/alilo/OneDrive - University of Twente/1 ANNO/quartile 4/means.xlsx")
 
 μ_L = means_df["load"].to_numpy()
 μ_E = means_df["generation"].to_numpy()
 μ_P = means_df["price"].to_numpy()
 
 # Load true qualities
-#true_df = pd.read_excel("C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/true_qualities.xlsx")
-true_df = pd.read_excel("C:/Users/alilo/OneDrive - University of Twente/1 ANNO/quartile 4/true_qualities.xlsx")
+true_df = pd.read_excel("C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/true_qualities.xlsx")
+#true_df = pd.read_excel("C:/Users/alilo/OneDrive - University of Twente/1 ANNO/quartile 4/true_qualities.xlsx")
 true_df.set_index(['gamma 1', 'gamma 2'], inplace=True)
 true_quality = np.array([true_df.loc[(γ1, γ2), 'mean'] for (γ1, γ2) in Y])
 
@@ -103,17 +103,40 @@ def simulate_policy_online(policy, M, N, E_all, L_all, P_all, true_quality, seed
                     choice = rng.integers(K)  # explore
                 else:
                    choice = np.argmax(μ)  # exploit
+
             elif policy == "kg":
-                total_std = np.sqrt(var + var_w)
-                kg_values = np.zeros(K)
-                for i in range(K):
-                    # Find the next-best mean (excluding alternative i)
-                    μ_others = np.delete(μ, i)
-                    μ_star = np.max(μ_others)
-                    z = np.abs(μ[i] - μ_star) / total_std[i] if total_std[i] > 0 else 0.0
-                    h_z = norm.pdf(z) + z * (1 - norm.cdf(z))
-                    kg_values[i] = h_z * total_std[i]
-                choice = np.argmax(μ + kg_values)
+                tilde_sigma = np.sqrt((var * var_w) / (var + var_w))
+
+                # Compute μ_star: max of μ excluding self
+                μ_matrix = np.tile(μ, (K, 1))      # K x K matrix
+                np.fill_diagonal(μ_matrix, -np.inf)
+                μ_star = μ_matrix.max(axis=1)      # Vector of best μ excluding i
+
+                # Compute zeta
+                zeta = -(μ - μ_star) / tilde_sigma
+
+                # KG value: ν_kg = tilde_sigma * f(zeta)
+                f_zeta = zeta * norm.cdf(zeta) + norm.pdf(zeta)
+                ν_kg = tilde_sigma * f_zeta
+
+                # Final score for online KG
+                score = μ + (N - n) * ν_kg
+                choice = np.argmax(score)
+
+
+
+
+            # elif policy == "kg":
+            #     total_std = np.sqrt(var + var_w)
+            #     kg_values = np.zeros(K)
+            #     for i in range(K):
+            #         # Find the next-best mean (excluding alternative i)
+            #         μ_others = np.delete(μ, i)
+            #         μ_star = np.max(μ_others)
+            #         z = np.abs(μ[i] - μ_star) / total_std[i] if total_std[i] > 0 else 0.0
+            #         h_z = norm.pdf(z) + z * (1 - norm.cdf(z))
+            #         kg_values[i] = h_z * total_std[i]
+            #     choice = np.argmax(μ + kg_values)
 
             else:
                 raise ValueError("Unknown policy")
