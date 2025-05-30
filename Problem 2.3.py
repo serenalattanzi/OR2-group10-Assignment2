@@ -133,23 +133,6 @@ def simulate_policy_online(policy, M, N, E_all, L_all, P_all, true_quality, seed
                 best_candidates = np.flatnonzero(score == max_score)
                 choice = rng.choice(best_candidates)
 
-
-
-
-
-
-            # elif policy == "kg":
-            #     total_std = np.sqrt(var + var_w)
-            #     kg_values = np.zeros(K)
-            #     for i in range(K):
-            #         # Find the next-best mean (excluding alternative i)
-            #         μ_others = np.delete(μ, i)
-            #         μ_star = np.max(μ_others)
-            #         z = np.abs(μ[i] - μ_star) / total_std[i] if total_std[i] > 0 else 0.0
-            #         h_z = norm.pdf(z) + z * (1 - norm.cdf(z))
-            #         kg_values[i] = h_z * total_std[i]
-            #     choice = np.argmax(μ + kg_values)
-
             else:
                 raise ValueError("Unknown policy")
 

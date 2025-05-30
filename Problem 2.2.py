@@ -239,9 +239,9 @@ for policy, matrix in results.items():
     avg_curve = matrix.mean(axis=0)
     plt.plot(avg_curve, label=policy.replace("_", " ").title())
 
-plt.title("Offline Learning — Average True Quality of Best Belief")
+plt.title("Offline Learning")
 plt.xlabel("Day")
-plt.ylabel("True Quality")
+plt.ylabel("Quality")
 plt.legend()
 plt.grid(True)
 plt.tight_layout()
