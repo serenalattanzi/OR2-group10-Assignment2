@@ -124,42 +124,34 @@ def simulate_policy_offline(policy, M, N, E_all, L_all, P_all, δ=5, RC=50):
             if policy == "exploration":
                 choice = np.random.randint(K)
             elif policy == "exploitation":
-                choice = np.argmax(μ)
+                max_μ = np.max(μ)
+                candidates = np.flatnonzero(μ == max_μ)  # Indices of alternatives with max mean
+                choice = rng.choice(candidates)
             elif policy == "ε_greedy":
                 c = 0.95  
                 ε = c / (n + 1)  # +1 to avoid div by zero
                 if rng.random() < ε:
-                    choice = rng.integers(K)  # explore
+                    choice = rng.integers(K)  # Explore
                 else:
-                   choice = np.argmax(μ)  # exploit
+                   max_μ = np.max(μ)
+                   candidates = np.flatnonzero(μ == max_μ) # Exploit
+                   choice = rng.choice(candidates)
             elif policy == "kg":
-                # Step 1: Compute σ_tilde_i
                 β = 1 / var
-                β_w = 1 / var_w
+                β_w = 1 / var_w 
                 var_tilde = (1 / β) - (1 / (β + β_w))
                 σ_tilde = np.sqrt(var_tilde)
-
-                # Step 2: Compute μ_star = max(μ[j ≠ i]) for each i
-                μ_matrix = np.tile(μ, (K, 1))  # K x K
-                np.fill_diagonal(μ_matrix, -np.inf)
+              
+                μ_matrix = np.tile(μ, (K, 1))  # Matrix of means
+                np.fill_diagonal(μ_matrix, -np.inf) # Fill diagonal with -inf to ignore self-comparison
                 μ_star = μ_matrix.max(axis=1)  # vector of max for j ≠ i
-
-                # Step 3: Compute ζ = -|μ_i - μ_star| / σ_tilde
-                ζ = -np.abs(μ - μ_star) / σ_tilde
-
-                # Step 4: f(ζ) = ζΦ(ζ) + φ(ζ)
+               
+                ζ = -np.abs((μ - μ_star) / σ_tilde) 
                 f_ζ = ζ * norm.cdf(ζ) + norm.pdf(ζ)
-
-                # Step 5: Compute ν_KG = σ_tilde * f(ζ)
                 ν_kg = σ_tilde * f_ζ
-
-                # Step 6: Final KG score
-                score = ν_kg  # or μ + ν_kg if you prefer to include prior means
-
-                # Step 7: Choose best, with tie-breaking
-                max_score = np.max(score)
-                best_candidates = np.flatnonzero(score == max_score)
-                choice = rng.choice(best_candidates)
+                
+                candidates = np.flatnonzero(ν_kg == np.max(ν_kg)) # Choose indices where ν_kg is maximum
+                choice = rng.choice(candidates) # Randomly select if multiple candidates have the same score
 
             else:
                 raise ValueError("Unknown policy")

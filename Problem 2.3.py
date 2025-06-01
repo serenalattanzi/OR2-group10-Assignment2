@@ -112,14 +112,18 @@ def simulate_policy_online(policy, M, N, E_all, L_all, P_all, true_quality, seed
             if policy == "exploration":
                 choice = rng.integers(K)
             elif policy == "exploitation":
-                choice = np.argmax(μ)
+                max_μ = np.max(μ)
+                candidates = np.flatnonzero(μ == max_μ)  # Indices of alternatives with max mean
+                choice = rng.choice(candidates)
             elif policy == "ε_greedy":
                 c = 0.95  
                 ε = c / (n + 1)  # +1 to avoid div by zero
                 if rng.random() < ε:
-                    choice = rng.integers(K)  # explore
+                    choice = rng.integers(K)  # Explore
                 else:
-                   choice = np.argmax(μ)  # exploit
+                   max_μ = np.max(μ)
+                   candidates = np.flatnonzero(μ == max_μ) # Exploit
+                   choice = rng.choice(candidates)
             elif policy == "kg":
                 # Step 1: Compute σ_tilde_i
                 β = 1 / var
@@ -127,24 +131,16 @@ def simulate_policy_online(policy, M, N, E_all, L_all, P_all, true_quality, seed
                 var_tilde = (1 / β) - (1 / (β + β_w))
                 σ_tilde = np.sqrt(var_tilde)
 
-                # Step 2: Compute μ_star = max_{j ≠ i} μ_j for each i
                 μ_matrix = np.tile(μ, (K, 1))  # shape (K, K)
                 np.fill_diagonal(μ_matrix, -np.inf)
                 μ_star = μ_matrix.max(axis=1)
 
-                # Step 3: ζ_i = -|μ_i - μ_star| / σ_tilde_i
-                ζ = -np.abs(μ - μ_star) / σ_tilde
-
-                # Step 4: f(ζ) = ζ Φ(ζ) + φ(ζ)
+                ζ = -np.abs((μ - μ_star) / σ_tilde)
                 f_ζ = ζ * norm.cdf(ζ) + norm.pdf(ζ)
-
-                # Step 5: ν_KG = σ_tilde * f(ζ)
                 ν_kg = σ_tilde * f_ζ
 
-                # Step 6: OKG Score
                 score = μ + (N - n) * ν_kg
-
-                # Step 7: Choose best with tie-breaking
+            
                 max_score = np.max(score)
                 best_candidates = np.flatnonzero(score == max_score)
                 choice = rng.choice(best_candidates)
