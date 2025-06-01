@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 from scipy.stats import truncnorm, norm
 from tqdm import tqdm
 
-# Load daily average profiles
+# Data Input
+# Means File
 #Serena
 means_df = pd.read_excel("C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/means.xlsx")
 # Alice
@@ -141,7 +142,6 @@ def simulate_policy_online(policy, M, N, E_all, L_all, P_all, true_quality, seed
                 score = μ + (N - n) * ν_kg 
                 candidates = np.flatnonzero(score == np.max(score))
                 choice = rng.choice(candidates)
-
             else:
                 raise ValueError("Unknown policy")
 

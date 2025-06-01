@@ -152,7 +152,6 @@ def simulate_policy_offline(policy, M, N, E_all, L_all, P_all, δ=5, RC=50):
                 
                 candidates = np.flatnonzero(ν_kg == np.max(ν_kg)) # Choose indices where ν_kg is maximum
                 choice = rng.choice(candidates) # Randomly select if multiple candidates have the same score
-
             else:
                 raise ValueError("Unknown policy")
 
