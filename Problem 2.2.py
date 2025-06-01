@@ -11,30 +11,44 @@ path = "C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/means.xlsx"
 means_df = pd.read_excel(path)
 means_df.head() # Visualize first rows
 print(means_df.head(10)) 
-
 # Means
 μ_L = means_df["load"].to_numpy()        # μ_L[t] = average load at time t
 μ_E = means_df["generation"].to_numpy()  # μ_E[t] = average generation at time t
 μ_P = means_df["price"].to_numpy()       # μ_P[t] = average market price at time t        
 
-# Given parameters
-δ = 5    # Maximum energy flow per time step [kWh]
-RC = 50  # Battery capacity [kWh]
-T = 97   # Number of time steps per day (15-minute intervals)
+# Decision Rule Thresholds
+Y = [(γ1, γ2) for γ1 in range(22, 27) for γ2 in range(25, 31) if γ1 < γ2]
+K = len(Y)  # Total number of alternatives (27)
 
-#Running
+# True qualities input 
+true_df = pd.read_excel("C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/true_qualities.xlsx")
+#true_df = pd.read_excel("C:/Users/alilo/OneDrive - University of Twente/1 ANNO/quartile 4/true_qualities.xlsx")
+true_df.set_index(['gamma 1', 'gamma 2'], inplace=True)
+true_quality = np.array([true_df.loc[(γ1, γ2), 'mean'] for (γ1, γ2) in Y])
+
+# Given parameters
+δ = 5  # Maximum energy flow per time step [kWh]
+RC = 50  # Battery capacity [kWh]
+T = 97  # Number of time steps per day (15-minute intervals)
+
+# Parameters for the policies
+σ_w = 1200 
+var_w = σ_w**2  # Constant observation variance for all alternatives
+ε0 = 0.95  # Epsilon for epsilon-greedy policy
+
+# Running Parameters
 M = 100  # Number of experiments
 N = 500  # Number of days to simulate
 
 #Parameters sample creation
 def sample_parameters(M, N, μ_L, μ_E, μ_P, rng, T=97):
-
     #Generation
     μ_E_mat = np.tile(μ_E, (M, N, 1))
     E_std = np.sqrt(0.0625)
     E_low = μ_E_mat - 0.5
     E_high = μ_E_mat + 0.5
     E_t_all = truncnorm.rvs((E_low - μ_E_mat) / E_std, (E_high - μ_E_mat) / E_std, loc=μ_E_mat, scale=E_std, size=(M, N, T), random_state=rng)
+    
     #Load
     μ_L_mat = np.tile(μ_L, (M, N, 1))
     L_std = np.sqrt(0.625)
@@ -51,19 +65,6 @@ def sample_parameters(M, N, μ_L, μ_E, μ_P, rng, T=97):
     P_t_all = truncnorm.rvs((P_low - μ_P_mat) / P_std, (P_high - μ_P_mat) / P_std, loc=μ_P_mat, scale=P_std, size=(M, N, T), random_state=rng)
     
     return E_t_all, L_t_all, P_t_all
-
-# Decision Rule Thresholds
-Y = [(γ1, γ2) for γ1 in range(22, 27) for γ2 in range(25, 31) if γ1 < γ2]
-K = len(Y)  # Total number of alternatives (27)
-
-# True qualities input 
-true_df = pd.read_excel("C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/true_qualities.xlsx")
-#true_df = pd.read_excel("C:/Users/alilo/OneDrive - University of Twente/1 ANNO/quartile 4/true_qualities.xlsx")
-true_df.set_index(['gamma 1', 'gamma 2'], inplace=True)
-
-# Get ordered true quality and variance arrays matching Y
-true_quality = np.array([true_df.loc[(γ1, γ2), 'mean'] for (γ1, γ2) in Y])
-true_variance = np.array([true_df.loc[(γ1, γ2), 'variance'] for (γ1, γ2) in Y])
 
 #Simulate one day
 def simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
@@ -106,26 +107,17 @@ def simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
 
     return C
 
+# Simulate policies offline
 def simulate_policy_offline(policy, M, N, E_all, L_all, P_all, δ=5, RC=50):
-    #Prior beliefs
-    μ_0 = np.full(K, 5500.0)      # prior mean
-    var_0 = np.full(K, 1200.0**2) # prior variance
-
-    # Known variances
-    σ_w = 1200 # Constant observation variance for all alternatives
-    var_w = σ_w**2  
-
     # Storage
     quality_matrix = np.zeros((M, N))
 
-    # Epsilon for epsilon-greedy policy
-    ε0 = 0.95
-
     # Run M experiments
-
     for m in tqdm(range(M), desc=policy):
-        μ = μ_0.copy()
-        var = var_0.copy()
+
+        # Initial beliefs
+        μ = np.full(K, 5500.0) # Prior mean
+        var = np.full(K, 1200.0**2) # Prior variance
         rng = np.random.default_rng(seeds[m])  # New seed for each experiment
     
         for n in range(N):
@@ -141,25 +133,25 @@ def simulate_policy_offline(policy, M, N, E_all, L_all, P_all, δ=5, RC=50):
                 else:
                    choice = np.argmax(μ)  # exploit
             elif policy == "kg":
-                # Step 1: Compute tilde_sigma_i
-                beta = 1 / var
-                beta_w = 1 / var_w
-                sigma2_tilde = (1 / beta) - (1 / (beta + beta_w))
-                tilde_sigma = np.sqrt(sigma2_tilde)
+                # Step 1: Compute σ_tilde_i
+                β = 1 / var
+                β_w = 1 / var_w
+                var_tilde = (1 / β) - (1 / (β + β_w))
+                σ_tilde = np.sqrt(var_tilde)
 
                 # Step 2: Compute μ_star = max(μ[j ≠ i]) for each i
                 μ_matrix = np.tile(μ, (K, 1))  # K x K
                 np.fill_diagonal(μ_matrix, -np.inf)
                 μ_star = μ_matrix.max(axis=1)  # vector of max for j ≠ i
 
-                # Step 3: Compute zeta = -|μ_i - μ_star| / tilde_sigma
-                zeta = -np.abs(μ - μ_star) / tilde_sigma
+                # Step 3: Compute ζ = -|μ_i - μ_star| / σ_tilde
+                ζ = -np.abs(μ - μ_star) / σ_tilde
 
-                # Step 4: f(zeta) = ζΦ(ζ) + φ(ζ)
-                f_zeta = zeta * norm.cdf(zeta) + norm.pdf(zeta)
+                # Step 4: f(ζ) = ζΦ(ζ) + φ(ζ)
+                f_ζ = ζ * norm.cdf(ζ) + norm.pdf(ζ)
 
-                # Step 5: Compute ν_KG = tilde_sigma * f(zeta)
-                ν_kg = tilde_sigma * f_zeta
+                # Step 5: Compute ν_KG = σ_tilde * f(ζ)
+                ν_kg = σ_tilde * f_ζ
 
                 # Step 6: Final KG score
                 score = ν_kg  # or μ + ν_kg if you prefer to include prior means

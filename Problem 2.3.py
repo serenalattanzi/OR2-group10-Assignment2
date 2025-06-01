@@ -4,19 +4,6 @@ import matplotlib.pyplot as plt
 from scipy.stats import truncnorm, norm
 from tqdm import tqdm
 
-# General simulation settings
-M = 100     # Number of experiments
-N = 500     # Number of days per experiment
-T = 97      # Number of time steps per day
-δ = 5       # Max charge/discharge rate
-RC = 50     # Battery capacity
-σ_w = 1200  # Standard deviation of observation noise
-var_w = σ_w ** 2
-
-# Set of alternatives: 27 (γ₁, γ₂) pairs
-Y = [(γ1, γ2) for γ1 in range(22, 27) for γ2 in range(25, 31) if γ1 < γ2]
-K = len(Y)
-
 # Load daily average profiles
 #Serena
 means_df = pd.read_excel("C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/means.xlsx")
@@ -26,15 +13,29 @@ means_df = pd.read_excel("C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignm
 μ_E = means_df["generation"].to_numpy()
 μ_P = means_df["price"].to_numpy()
 
-# Load true qualities
+# Set of alternatives: 27 (γ₁, γ₂) pairs
+Y = [(γ1, γ2) for γ1 in range(22, 27) for γ2 in range(25, 31) if γ1 < γ2]
+K = len(Y)
+
+# True qualities input
 true_df = pd.read_excel("C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/true_qualities.xlsx")
 #true_df = pd.read_excel("C:/Users/alilo/OneDrive - University of Twente/1 ANNO/quartile 4/true_qualities.xlsx")
 true_df.set_index(['gamma 1', 'gamma 2'], inplace=True)
 true_quality = np.array([true_df.loc[(γ1, γ2), 'mean'] for (γ1, γ2) in Y])
 
+# Given parameters
+T = 97      # Number of time steps per day
+δ = 5       # Max charge/discharge rate
+RC = 50     # Battery capacity
+σ_w = 1200  # Standard deviation of observation noise
+var_w = σ_w ** 2
+
+# Running parameters
+M = 100     # Number of experiments
+N = 500     # Number of days per experiment
+
 # Sampling Parameters
 def sample_parameters(M, N, μ_L, μ_E, μ_P, rng, T=97):
-
     #Generation
     μ_E_mat = np.tile(μ_E, (M, N, 1))
     E_std = np.sqrt(0.0625)
@@ -59,8 +60,8 @@ def sample_parameters(M, N, μ_L, μ_E, μ_P, rng, T=97):
     
     return E_t_all, L_t_all, P_t_all
 
+# Simulate one day
 def simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
-
     R = 25
     C = 0
     T = E_t.shape[0]
@@ -85,7 +86,6 @@ def simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
             xMR = min(RC - R - xER, δ - xER)
         else:
             xMR = 0
-
         if dont_charge and P > 0:
             xRM = min(δ - xRL, R - xRL)
         elif P >= γ2:
@@ -94,12 +94,11 @@ def simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
             xRM = 0
         R = R + xER + xMR - xRL - xRM
         R = min(RC, max(0, R))  
-
         c = P * (xRM + L) - P * (xML + xMR)
         C += c
-
     return C
 
+# Simulate policies online
 def simulate_policy_online(policy, M, N, E_all, L_all, P_all, true_quality, seeds, δ=5, RC=50):
     ε0 = 0.95
     quality_matrix = np.zeros((M, N))
@@ -115,36 +114,32 @@ def simulate_policy_online(policy, M, N, E_all, L_all, P_all, true_quality, seed
             elif policy == "exploitation":
                 choice = np.argmax(μ)
             elif policy == "ε_greedy":
-                # ε = ε0 * (1 - n / N)
-                # choice = rng.integers(K) if rng.random() < ε else np.argmax(μ
-
-                c = 0.95  # pick any constant in (0, 1)
+                c = 0.95  
                 ε = c / (n + 1)  # +1 to avoid div by zero
                 if rng.random() < ε:
                     choice = rng.integers(K)  # explore
                 else:
                    choice = np.argmax(μ)  # exploit
-
             elif policy == "kg":
-                # Step 1: Compute tilde_sigma_i
-                beta = 1 / var
-                beta_w = 1 / var_w
-                sigma2_tilde = (1 / beta) - (1 / (beta + beta_w))
-                tilde_sigma = np.sqrt(sigma2_tilde)
+                # Step 1: Compute σ_tilde_i
+                β = 1 / var
+                β_w = 1 / var_w
+                var_tilde = (1 / β) - (1 / (β + β_w))
+                σ_tilde = np.sqrt(var_tilde)
 
                 # Step 2: Compute μ_star = max_{j ≠ i} μ_j for each i
                 μ_matrix = np.tile(μ, (K, 1))  # shape (K, K)
                 np.fill_diagonal(μ_matrix, -np.inf)
                 μ_star = μ_matrix.max(axis=1)
 
-                # Step 3: ζ_i = -|μ_i - μ_star| / tilde_sigma_i
-                zeta = -np.abs(μ - μ_star) / tilde_sigma
+                # Step 3: ζ_i = -|μ_i - μ_star| / σ_tilde_i
+                ζ = -np.abs(μ - μ_star) / σ_tilde
 
                 # Step 4: f(ζ) = ζ Φ(ζ) + φ(ζ)
-                f_zeta = zeta * norm.cdf(zeta) + norm.pdf(zeta)
+                f_ζ = ζ * norm.cdf(ζ) + norm.pdf(ζ)
 
-                # Step 5: ν_KG = tilde_sigma * f(ζ)
-                ν_kg = tilde_sigma * f_zeta
+                # Step 5: ν_KG = σ_tilde * f(ζ)
+                ν_kg = σ_tilde * f_ζ
 
                 # Step 6: OKG Score
                 score = μ + (N - n) * ν_kg
