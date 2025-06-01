@@ -18,9 +18,9 @@ print(means_df.head(10))
 μ_P = means_df["price"].to_numpy()       # μ_P[t] = average market price at time t
 
 # Given parameters
-δ = 5                   # δ: maximum energy flow per time step [kWh]
-RC = 50                 # RC: battery capacity [kWh]
-T = 97                  # T: number of time steps per day (15-minute intervals)
+δ = 5  # Maximum energy flow per time step [kWh]
+RC = 50  # Battery capacity [kWh]
+T = 97  # Number of time steps per day (15-minute intervals)
 
 # Decision Rule Thresholds
 alts = [(γ1, γ2) for γ1 in range(22, 27) for γ2 in range(25, 31) if γ1 < γ2]  # Definition of the 27 alternatives

@@ -36,13 +36,13 @@ print(means_df.head(10))
 #C   → total daily profit [€]
 
 # Given parameters
-δ = 5                   # δ: maximum energy flow per time step [kWh]
-RC = 50                 # RC: battery capacity [kWh]
-T = 97                  # T: number of time steps per day (15-minute intervals)
+δ = 5  # Maximum energy flow per time step [kWh]
+RC = 50 # Battery capacity [kWh]
+T = 97  # Number of time steps per day (15-minute intervals)
 
 # Decision Rule Thresholds
-γ1 = 23                 # γ₁: price threshold to start buying (from market or storing excess generation)
-γ2 = 26                 # γ₂: price threshold to start selling (from battery to market)
+γ1 = 23  # Price threshold to start buying (from market or storing excess generation)
+γ2 = 26  # Price threshold to start selling (from battery to market)
 
 #Creation of the sampled parameters
 def samples_matrix(N, μ_L, μ_E, μ_P, δ, RC, T=97):

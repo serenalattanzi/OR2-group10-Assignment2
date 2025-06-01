@@ -24,18 +24,18 @@ true_df.set_index(['gamma 1', 'gamma 2'], inplace=True)
 true_quality = np.array([true_df.loc[(γ1, γ2), 'mean'] for (γ1, γ2) in Y])
 
 # Given parameters
-T = 97      # Number of time steps per day
-δ = 5       # Max charge/discharge rate
-RC = 50     # Battery capacity
+T = 97  # Number of time steps per day
+δ = 5  # Max charge/discharge rate
+RC = 50  # Battery capacity
 σ_w = 1200  # Standard deviation of observation noise
 var_w = σ_w ** 2
 
 # Running parameters
-M = 100     # Number of experiments
-N = 500     # Number of days per experiment
+M = 100  # Number of experiments
+N = 500  # Number of days per experiment
 
 # Sampling Parameters
-def sample_parameters(M, N, μ_L, μ_E, μ_P, rng, T=97):
+def sample_parameters(M, N, μ_L, μ_E, μ_P, rng, T=97):      
     #Generation
     μ_E_mat = np.tile(μ_E, (M, N, 1))
     E_std = np.sqrt(0.0625)
