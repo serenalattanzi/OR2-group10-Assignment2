@@ -125,25 +125,22 @@ def simulate_policy_online(policy, M, N, E_all, L_all, P_all, true_quality, seed
                    candidates = np.flatnonzero(μ == max_μ) # Exploit
                    choice = rng.choice(candidates)
             elif policy == "kg":
-                # Step 1: Compute σ_tilde_i
                 β = 1 / var
                 β_w = 1 / var_w
                 var_tilde = (1 / β) - (1 / (β + β_w))
                 σ_tilde = np.sqrt(var_tilde)
 
-                μ_matrix = np.tile(μ, (K, 1))  # shape (K, K)
-                np.fill_diagonal(μ_matrix, -np.inf)
-                μ_star = μ_matrix.max(axis=1)
+                μ_matrix = np.tile(μ, (K, 1))  # Matrix of means
+                np.fill_diagonal(μ_matrix, -np.inf) # Fill diagonal with -inf to ignore self-comparison
+                μ_star = μ_matrix.max(axis=1)  # vector of max for j ≠ i
 
                 ζ = -np.abs((μ - μ_star) / σ_tilde)
                 f_ζ = ζ * norm.cdf(ζ) + norm.pdf(ζ)
                 ν_kg = σ_tilde * f_ζ
 
-                score = μ + (N - n) * ν_kg
-            
-                max_score = np.max(score)
-                best_candidates = np.flatnonzero(score == max_score)
-                choice = rng.choice(best_candidates)
+                score = μ + (N - n) * ν_kg 
+                candidates = np.flatnonzero(score == np.max(score))
+                choice = rng.choice(candidates)
 
             else:
                 raise ValueError("Unknown policy")
