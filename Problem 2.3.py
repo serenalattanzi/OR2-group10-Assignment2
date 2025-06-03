@@ -101,7 +101,6 @@ def simulate_one_day(E_t, L_t, P_t, γ1, γ2, δ=5, RC=50):
 
 # Simulate policies online
 def simulate_policy_online(policy, M, N, E_all, L_all, P_all, true_quality, seeds, δ=5, RC=50):
-    ε0 = 0.95
     quality_matrix = np.zeros((M, N))
 
     for m in tqdm(range(M), desc=f"{policy}"):

@@ -34,7 +34,6 @@ T = 97  # Number of time steps per day (15-minute intervals)
 # Parameters for the policies
 σ_w = 1200 
 var_w = σ_w**2  # Constant observation variance for all alternatives
-ε0 = 0.95  # Epsilon for epsilon-greedy policy
 
 # Running Parameters
 M = 100  # Number of experiments
