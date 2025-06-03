@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt  # Plotting and visualization
 
 #Data Input
 path = "C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/means.xlsx"
-#path = "C:/Users/alilo\OneDrive - University of Twente/1 ANNO/quartile 4/means.xlsx"
+
 means_df = pd.read_excel(path)
 means_df.head() # Visualize first rows
 print(means_df.head(10)) 

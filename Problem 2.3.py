@@ -6,10 +6,8 @@ from tqdm import tqdm
 
 # Data Input
 # Means File
-#Serena
 means_df = pd.read_excel("C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/means.xlsx")
-# Alice
-#means_df = pd.read_excel("C:/Users/alilo/OneDrive - University of Twente/1 ANNO/quartile 4/means.xlsx")
+
 μ_L = means_df["load"].to_numpy()
 μ_E = means_df["generation"].to_numpy()
 μ_P = means_df["price"].to_numpy()
@@ -20,7 +18,7 @@ K = len(Y)
 
 # True qualities input
 true_df = pd.read_excel("C:/Users/seren/OneDrive/Escritorio/OR2-group10-Assignment2/true_qualities.xlsx")
-#true_df = pd.read_excel("C:/Users/alilo/OneDrive - University of Twente/1 ANNO/quartile 4/true_qualities.xlsx")
+
 true_df.set_index(['gamma 1', 'gamma 2'], inplace=True)
 true_quality = np.array([true_df.loc[(γ1, γ2), 'mean'] for (γ1, γ2) in Y])
 
