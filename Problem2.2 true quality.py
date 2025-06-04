@@ -29,20 +29,23 @@ alts = [(γ1, γ2) for γ1 in range(22, 27) for γ2 in range(25, 31) if γ1 < γ
 def samples_matrix(N, μ_L, μ_E, μ_P, δ, RC, T=97):
     #Random Number Generator
     rng = np.random.default_rng(seed=1)
+    rng_E = np.random.default_rng(seed=42)  # For energy generation
+    rng_L = np.random.default_rng(seed=43)  # For load
+    rng_P = np.random.default_rng(seed=44)  # For price
 
     #Generation
     μ_E_mat = np.tile(μ_E, (N, 1))
     E_std = np.sqrt(0.0625)
     E_low = μ_E_mat - 0.5
     E_high = μ_E_mat + 0.5
-    E_t_all = truncnorm.rvs((E_low - μ_E_mat) / E_std, (E_high - μ_E_mat) / E_std, loc=μ_E_mat, scale=E_std, size=(N, T), random_state=rng)
+    E_t_all = truncnorm.rvs((E_low - μ_E_mat) / E_std, (E_high - μ_E_mat) / E_std, loc=μ_E_mat, scale=E_std, size=(N, T), random_state=rng_E)
 
     #Load
     μ_L_mat = np.tile(μ_L, (N, 1))
     L_std = np.sqrt(0.625)
     L_low = μ_L_mat - 3.75
     L_high = μ_L_mat + 3.75
-    L_t_all = truncnorm.rvs((L_low - μ_L_mat) / L_std, (L_high - μ_L_mat) / L_std, loc=μ_L_mat, scale=L_std, size=(N, T), random_state=rng)
+    L_t_all = truncnorm.rvs((L_low - μ_L_mat) / L_std, (L_high - μ_L_mat) / L_std, loc=μ_L_mat, scale=L_std, size=(N, T), random_state=rng_L)
 
     #Price
     μ_P_mat = np.tile(μ_P, (N, 1))
@@ -50,7 +53,7 @@ def samples_matrix(N, μ_L, μ_E, μ_P, δ, RC, T=97):
     P_std = np.where(mix, np.sqrt(10000), np.sqrt(10))
     P_low = np.where(mix, μ_P_mat - 25, μ_P_mat - 50)
     P_high = np.where(mix, μ_P_mat + 200, μ_P_mat + 50)
-    P_t_all = truncnorm.rvs((P_low - μ_P_mat) / P_std, (P_high - μ_P_mat) / P_std, loc=μ_P_mat, scale=P_std, size=(N, T), random_state=rng)
+    P_t_all = truncnorm.rvs((P_low - μ_P_mat) / P_std, (P_high - μ_P_mat) / P_std, loc=μ_P_mat, scale=P_std, size=(N, T), random_state=rng_P)
 
     return E_t_all, L_t_all, P_t_all
 
